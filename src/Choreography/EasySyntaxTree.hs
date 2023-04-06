@@ -1,13 +1,12 @@
-module Choreography.AbstractSyntaxTree
+module Choreography.EasySyntaxTree
 where
 
 import Choreography.Party (Party(..))
 
 
-data Variable = Variable {party :: Party, variable :: String}
-              deriving (Eq, Ord, Show)
+type Variable = String
 
-data Algebra = Literal Party Bool
+data Algebra = Literal Bool
              | Var Variable
              | Xor Algebra Algebra
              | And Algebra Algebra
@@ -15,12 +14,11 @@ data Algebra = Literal Party Bool
              deriving (Show)
 
 data Expression = Compute Algebra
-                | Secret Party
-                | Flip Party
+                | Secret
+                | Flip
                 | Send Party Algebra
                 | Output Algebra
+                | Annotated Party Expression
                 deriving (Show)
 
-type LineNo = Int
-
-type Program = [(LineNo, Variable, Expression)]
+newtype Program = Program [(Variable, Expression)] deriving (Show)

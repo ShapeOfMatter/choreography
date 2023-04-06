@@ -28,11 +28,19 @@ extra-source-files:
 common basic-config
     default-language: Haskell2010
     build-depends:    base ^>=4.14.3.0
-                     ,Cabal >= 3.6
-                     ,QuickCheck >= 2.14
+                     ,Cabal ^>= 3.6
+                     ,containers ^>= 0.6
+                     -- ,ghc >=8.10 && <9.0
+                     ,polysemy ^>= 1.9
+                     -- ,polysemy-plugin ^>= 0.4.4
+                     ,QuickCheck ^>= 2.14
     ghc-options:
       -Wall
       -fprint-potential-instances
+      -package=polysemy
+      -package=polysemy-plugin
+      -fplugin=Polysemy.Plugin
+      -- I think it also needed `cabal install --lib polysemy-plugin`?
     default-extensions: AllowAmbiguousTypes
                        ,BlockArguments
                        ,DataKinds
@@ -72,6 +80,9 @@ library
     exposed-modules:
       Choreography,
       Choreography.AbstractSyntaxTree,
+      Choreography.CoreSemantics,
+      Choreography.EasySyntaxTree,
+      Choreography.Party
       Distribution.TestSuite.QuickCheck
 
     hs-source-dirs:   src

@@ -1,7 +1,6 @@
 module Main where
 
-import Choreography.AbstractSyntaxTree (x)
+import Choreography.AbstractSyntaxTree ()
 
 main :: IO ()
 main = do putStrLn "Hello, Haskell!"
-          print x
