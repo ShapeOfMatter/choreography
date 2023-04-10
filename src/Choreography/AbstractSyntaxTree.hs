@@ -2,6 +2,7 @@ module Choreography.AbstractSyntaxTree
 where
 
 import Choreography.Party (Party(..))
+import Utils (LineNo)
 
 
 data Variable = Variable {party :: Party, variable :: String}
@@ -20,7 +21,5 @@ data Expression = Compute Algebra
                 | Send Party Algebra
                 | Output Algebra
                 deriving (Show)
-
-type LineNo = Int
 
 type Program = [(LineNo, Variable, Expression)]

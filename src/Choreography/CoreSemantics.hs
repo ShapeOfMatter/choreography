@@ -3,14 +3,15 @@ where
 
 import Data.Map.Strict ((!?), empty, insert, Map, singleton)
 import Polysemy (Members, run, Sem)
-import Polysemy.Error (Error, runError, throw)
+import Polysemy.Error (Error, runError)
 import Polysemy.Reader (ask, Reader, runReader)
 import Polysemy.State (evalState, get, modify, State)
-import Polysemy.Tagged (tag, Tagged, untag)
+import Polysemy.Tagged (Tagged, untag)
 import Polysemy.Writer (runWriter, tell, Writer)
 
 import Choreography.Party (Party(..))
 import Choreography.AbstractSyntaxTree
+import Utils (LineNo, throwLn)
 
 class NS ns where  -- There's got to be a better way to write this.
   namespace :: ns -> Map Variable Bool
@@ -51,13 +52,6 @@ gets var = do ns <- namespace <$> get @ns
               let mVal = ns !? var
               case mVal of Just val -> return val
                            Nothing -> throwLn $ "Could not find binding for " ++ variable var ++ "."
-
-throwLn :: forall a k r.
-           (Members '[Tagged k (Reader LineNo)
-                     ,Error String] r) =>
-           String -> Sem r a
-throwLn err = do ln <- tag $ ask @LineNo
-                 throw $ "[Line " ++ show ln ++ "] " ++ err
 
 semantics :: forall r.
              (Members '[
