@@ -30,7 +30,8 @@ common basic-config
     build-depends:    base ^>=4.14.3.0
                      ,Cabal ^>= 3.6
                      ,containers ^>= 0.6
-                     ,parsec >= 3.0.0
+                     ,distributive ^>= 0.6.2
+                     ,parsec >= 3.1.0
                      ,polysemy ^>= 1.9
                      ,QuickCheck ^>= 2.14
     ghc-options:
@@ -41,23 +42,28 @@ common basic-config
       -fplugin=Polysemy.Plugin
       -- I think it also needed `cabal install --lib polysemy-plugin`?
     default-extensions: AllowAmbiguousTypes
+                       ,BangPatterns
                        ,BlockArguments
                        ,DataKinds
                        ,FlexibleContexts
                        ,FlexibleInstances
+                       ,FunctionalDependencies
                        ,GADTs
                        ,GeneralizedNewtypeDeriving
                        ,LambdaCase
                        ,MultiParamTypeClasses
                        ,NamedFieldPuns
                        ,PolyKinds
+                       ,QuantifiedConstraints
                        ,RankNTypes
                        ,ScopedTypeVariables
+                       ,StandaloneDeriving
                        ,TemplateHaskell
                        ,TupleSections
                        ,TypeApplications
                        ,TypeOperators
                        ,TypeFamilies
+                       ,UndecidableInstances
 
 common lib-dependent
     import: basic-config
@@ -79,10 +85,10 @@ library
     exposed-modules:
       Choreography
       Choreography.AbstractSyntaxTree
-      Choreography.CoreSemantics
-      Choreography.EasySyntaxTree
+      --Choreography.EasySyntaxTree
       Choreography.Parser
       Choreography.Party
+      Choreography.Semantics
       Distribution.TestSuite.QuickCheck
       Utils
 

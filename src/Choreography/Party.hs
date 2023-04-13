@@ -1,12 +1,45 @@
 module Choreography.Party
 where
 
+import Data.List (intercalate)
+import Data.Set (disjoint, empty, Set, toList)
+import qualified Data.Set as Set
 
-newtype Party = Party String
-           deriving (Eq, Ord)
+import Utils (Pretty, pretty)
 
-instance Show Party where  -- not really proper, but I need it for sanity.
-  show (Party name) = name
+newtype Party = Party {party :: String}
+           deriving (Eq, Ord, Show)
+
+instance Pretty Party where
+  pretty = party
+
+newtype PartySet = Parties {parties :: Set Party} deriving (Eq, Ord, Show)
+
+instance Pretty PartySet where
+  pretty (Parties ps) | null ps = "⊤"
+                      | otherwise = intercalate ", " . toList $ pretty `Set.map` ps
+
+instance Semigroup PartySet where
+ (<>) = union
+
+top :: PartySet
+top = Parties empty
+
+union :: PartySet -> PartySet -> PartySet
+(Parties ps1) `union` (Parties ps2) | null ps1 = Parties empty
+                                    | null ps2 = Parties empty
+                                    | otherwise = Parties $ ps1 `Set.union` ps2
+
+intersect :: PartySet -> PartySet -> Maybe PartySet
+(Parties ps1) `intersect` (Parties ps2) | null ps1 = Just $ Parties ps2
+                                        | null ps2 = Just $ Parties ps1
+                                        | disjoint ps1 ps2 = Nothing
+                                        | otherwise = Just $ Parties $ ps1 `Set.intersection` ps2
+
+isSubsetOf :: PartySet -> PartySet -> Bool
+(Parties ps1) `isSubsetOf` (Parties ps2) | null ps2 = True
+                                         | null ps1 = False  -- unless masked by null ps2!
+                                         | otherwise = ps1 `Set.isSubsetOf` ps2
 
 p1 :: Party
 p1 = Party "P1"  -- "ℙ𝟙"

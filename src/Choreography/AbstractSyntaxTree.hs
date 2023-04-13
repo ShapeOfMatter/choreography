@@ -1,25 +1,87 @@
 module Choreography.AbstractSyntaxTree
 where
 
-import Choreography.Party (Party(..))
-import Utils (LineNo)
+import Choreography.Party (Party(..), PartySet)
+import Utils (Pretty, pretty, Pretty1)
 
 
-data Variable = Variable {party :: Party, variable :: String}
-              deriving (Eq, Ord, Show)
+newtype Variable = Variable {variable :: String} deriving (Eq, Ord, Show)
+instance Pretty Variable where pretty = variable
 
-data Algebra = Literal Party Bool
-             | Var Variable
-             | Xor Algebra Algebra
-             | And Algebra Algebra
-             | Not Algebra
-             deriving (Show)
+newtype Bit = Bit { bit :: Bool } deriving (Bounded, Enum, Eq, Ord, Show)
+trueNames :: [String]
+trueNames = ["1", "true"]
+falseNames :: [String]
+falseNames = ["0", "false"]
+instance Pretty Bit where
+  pretty (Bit True) = head trueNames
+  pretty (Bit False) = head falseNames
 
-data Expression = Compute Algebra
-                | Secret Party
-                | Flip Party
-                | Send Party Algebra
-                | Output Algebra
-                deriving (Show)
+data Algebra f = Literal (f Bit)
+               | Var (f Variable)
+               | Xor (f (Algebra f)) (f (Algebra f))
+               | And (f (Algebra f)) (f (Algebra f))
+               | Not (f (Algebra f))
+deriving instance (forall a. (Show a) => Show (f a)) => Show (Algebra f)
+xorNames :: [String]
+xorNames = ["⊕", "XOR", "+", "<>", "!=", "⊻"]
+andNames :: [String]
+andNames = ["∧", "AND", "*", "^"]
+notNames :: [String]
+notNames = ["¬", "NOT", "!", "~"]
+instance (Pretty1 f, Functor f) => Pretty (Algebra f) where
+  pretty (Literal fb) = pretty fb
+  pretty (Var fv) = pretty fv
+  pretty (Xor fa1 fa2) = unwords [pretty fa1, head xorNames, pretty fa2]
+  pretty (And fa1 fa2) = unwords [pretty fa1, head andNames, pretty fa2]
+  pretty (Not fa) = unwords [head notNames, pretty fa]
 
-type Program = [(LineNo, Variable, Expression)]
+data Statement f = Compute (f Variable) (f (Algebra f))
+                 | Secret (f Variable) (f Party)
+                 | Flip (f Variable) (f Party)
+                 | Send (f PartySet) (f Variable)
+                 | Oblivious (f Variable) (f PartySet) (f Variable) (f Variable, f Variable)
+                 --           bound        for          chooseby     true        false
+                 | Output (f Variable)
+deriving instance (forall a. (Show a) => Show (f a)) => Show (Statement f)
+bindKeyword :: String
+bindKeyword = "="
+atKeyword :: String
+atKeyword = "@"
+secretKeyword :: String
+secretKeyword = "SECRET"
+flipKeyword :: String
+flipKeyword = "FLIP"
+sendKeywords :: [String]
+sendKeywords = ["SEND", "TO"]
+oblivKeywords :: [String]
+oblivKeywords = ["OBLIVIOUSLYBY", "CHOOSE", "FOR"]
+outputKeyword :: String
+outputKeyword = "OUTPUT"
+instance (Pretty1 f, Functor f) => Pretty (Statement f) where
+  pretty (Compute fv fa) = unwords [pretty fv, bindKeyword, pretty fa]
+  pretty (Secret fv fp) = unwords [pretty fv, bindKeyword, secretKeyword, atKeyword, pretty fp]
+  pretty (Flip fv fp) = unwords [pretty fv, bindKeyword, flipKeyword, atKeyword, pretty fp]
+  pretty (Send fps fv) = unwords [head sendKeywords,
+                                  pretty fv,
+                                  sendKeywords !! 1,
+                                  pretty fps]
+  pretty (Oblivious fvb fps fvc fvs) = unwords [pretty fvb,
+                                                pretty bindKeyword,
+                                                head oblivKeywords,
+                                                pretty fvc,
+                                                oblivKeywords !! 1,
+                                                pretty $ fst fvs,
+                                                pretty $ snd fvs,
+                                                oblivKeywords !! 2,
+                                                pretty fps]
+  pretty (Output fv) = unwords [outputKeyword, pretty fv]
+
+type Program f = [f (Statement f)]
+
+class Proper f where
+  owners :: f a -> PartySet
+  value :: f a -> a
+instance Proper ((,) PartySet) where
+  owners = fst
+  value = snd
