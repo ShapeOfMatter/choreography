@@ -30,9 +30,11 @@ common basic-config
     build-depends:    base ^>=4.14.3.0
                      ,Cabal ^>= 3.6
                      ,containers ^>= 0.6
+                     ,deepseq >=1.1 && <1.5
                      ,distributive ^>= 0.6.2
                      ,parsec >= 3.1.0
                      ,polysemy ^>= 1.9
+                     ,process >=1.1.0.2 && <1.7
                      ,QuickCheck ^>= 2.14
     ghc-options:
       -Wall
@@ -90,12 +92,19 @@ library
       Choreography.Party
       Choreography.Semantics
       Distribution.TestSuite.QuickCheck
+      Python
       Utils
 
     hs-source-dirs:   src
 
-Test-Suite quickTests
+Test-Suite languageTests
     import: lib-dependent
     type:             detailed-0.9
     test-module:      Tests
+    hs-source-dirs:   tests
+
+Test-Suite pythonTests
+    import: lib-dependent
+    type:             detailed-0.9
+    test-module:      TPython
     hs-source-dirs:   tests

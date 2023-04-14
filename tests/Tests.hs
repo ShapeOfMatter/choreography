@@ -3,7 +3,7 @@ module Tests where
 import Data.Map.Strict (fromList, singleton, empty)
 import qualified Data.Set as Set
 import Distribution.TestSuite.QuickCheck
-import Test.QuickCheck ((===), Arbitrary (arbitrary), vectorOf)
+import Test.QuickCheck ((===), Arbitrary (arbitrary), vectorOf, ioProperty)
 import Text.Parsec (runParser)
 import Text.Parsec.String (parseFromFile)
 
@@ -17,8 +17,7 @@ import Data.List (nub)
 
 
 tests :: IO [Test]
-tests = do piplineTest <- pipeline
-           return [ tautology
+tests = do return [ tautology
                   , testEasyCompute
                   , testEasySecret
                   , testEasyFlip
@@ -28,7 +27,7 @@ tests = do piplineTest <- pipeline
                   , testOutput
                   , testSend
                   , example
-                  , piplineTest]
+                  , pipeline]
 
 
 tautology :: Test
@@ -144,24 +143,24 @@ example = testProperty "An easy example" $ (outputs, views) === deterministicEva
                                                 (Variable "rand", True)] )]
         outputs = Outputs $ singleton p1 $ singleton (Variable "y") True
 
-pipeline :: IO Test
-pipeline = do program' <- parseFromFile (changeState (const ()) (const empty) programParser) "examples/3partyXOR.cho"
-              let program = either (error . show) id program'
-              --let Right pass2 = run . runError $ compileSem pass1
-              return $ testProperty "3partyXOR.cho gives correct outputs" do  -- The Gen Monad!
-                let (c, h1, h2) = (Party "C", Party "H1", Party "H2")
-                secrets <- vectorOf 3 (arbitrary @Bool)
-                let inputs = Inputs $ fromList $ [Variable "c_in"
-                                                 ,Variable "h1_in"
-                                                 ,Variable "h2_in"] `zip` secrets
-                randomness <- vectorOf 6 (arbitrary @Bool)
-                let tapes = Tapes $ fromList $ [Variable "c_s1"
-                                               ,Variable "c_s2"
-                                               ,Variable "h1_s1"
-                                               ,Variable "h1_s2"
-                                               ,Variable "h2_s1"
-                                               ,Variable "h2_s2"] `zip` randomness
-                let y = foldl (/=) False secrets
-                let outputs = Outputs $ fromList $ [c, h1, h2] `zip` repeat (singleton (Variable "y") y)
-                let (observed, _) = deterministicEvaluation program inputs tapes
-                return $ observed === outputs
+pipeline :: Test
+pipeline = testProperty "3partyXOR.cho gives correct outputs" $ ioProperty do
+  program' <- parseFromFile (changeState (const ()) (const empty) programParser) "examples/3partyXOR.cho"
+  let program = either (error . show) id program'
+  return do  -- The Gen Monad!
+    let (c, h1, h2) = (Party "C", Party "H1", Party "H2")
+    secrets <- vectorOf 3 (arbitrary @Bool)
+    let inputs = Inputs $ fromList $ [Variable "c_in"
+                                     ,Variable "h1_in"
+                                     ,Variable "h2_in"] `zip` secrets
+    randomness <- vectorOf 6 (arbitrary @Bool)
+    let tapes = Tapes $ fromList $ [Variable "c_s1"
+                                   ,Variable "c_s2"
+                                   ,Variable "h1_s1"
+                                   ,Variable "h1_s2"
+                                   ,Variable "h2_s1"
+                                   ,Variable "h2_s2"] `zip` randomness
+    let y = foldl (/=) False secrets
+    let outputs = Outputs $ fromList $ [c, h1, h2] `zip` repeat (singleton (Variable "y") y)
+    let (observed, _) = deterministicEvaluation program inputs tapes
+    return $ observed === outputs

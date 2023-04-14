@@ -1,12 +1,13 @@
 module Utils
 where
 
+import Control.Exception (evaluate, Exception, try)
 import Data.Either (fromRight)
 import Data.Functor.Identity (Identity (runIdentity))
 import Data.Map.Strict (adjust, Map)
 import Polysemy (Sem)
 import Polysemy.Fail (Fail, runFail)
-import Text.Parsec
+import Text.Parsec hiding (try)
 
 
 class Pretty a where
@@ -77,3 +78,11 @@ changeState forward backward = mkPT . transform . runParsecT
       :: (State s u -> m (Consumed (m (Reply s u a))))
       -> (State s v -> m (Consumed (m (Reply s v a))))
     transform p st = fmap3 (mapReply forward) (p (mapState backward st))
+
+
+-- https://stackoverflow.com/a/35600656/10135377
+throwsException :: forall e a. Exception e => IO a -> IO Bool
+throwsException ioa = do eea <- try ioa
+                         either (const @(IO Bool) @e (return True)) (
+                             fmap (either (const @Bool @e True) (const False)) . try . evaluate
+                           ) eea
