@@ -17,8 +17,8 @@ instance Pretty a => Pretty (Maybe a) where
   pretty Nothing = "⎵"
 instance {-# OVERLAPPING  #-} Pretty String where
   pretty = id
-{-instance Pretty Bool where
-  pretty b = show $ fromEnum b-}
+instance Pretty Bool where
+  pretty b = show $ fromEnum b
 {-instance Pretty Rational where
   pretty r = case (numerator r, denominator r) of
                (n, 1) -> show n

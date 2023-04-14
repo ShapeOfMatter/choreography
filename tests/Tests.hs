@@ -3,7 +3,7 @@ module Tests where
 import Data.Map.Strict (fromList, singleton, empty)
 import qualified Data.Set as Set
 import Distribution.TestSuite.QuickCheck
-import Test.QuickCheck ((===), Arbitrary (arbitrary), vectorOf, ioProperty)
+import Test.QuickCheck ((===), Arbitrary (arbitrary), chooseInt, counterexample, Gen, ioProperty, Property, vectorOf)
 import Text.Parsec (runParser)
 import Text.Parsec.String (parseFromFile)
 
@@ -26,8 +26,10 @@ tests = do return [ tautology
                   , testLines
                   , testOutput
                   , testSend
+                  , testObliv
                   , example
-                  , pipeline]
+                  , pipeline
+                  , oneOfFourOT]
 
 
 tautology :: Test
@@ -122,6 +124,20 @@ testSend = testProperty "Test Send" $ (outputs, views) === deterministicEvaluati
         views = Views $ singleton p2 $ singleton (Variable "a") True
         outputs = Outputs empty
 
+testObliv :: Test
+testObliv = testProperty "Test Obliv" $ do -- the gen monad
+  b <- arbitrary @Bool
+  let program' = runParser programParser empty "hardcode example" $ "\
+        \a = " ++ pretty b ++ "\n\
+        \yes = 1\n\
+        \no = 0\n\
+        \b = OBLIVIOUSLYBY a CHOOSE yes no FOR P2\n\
+        \OUTPUT b"
+  let program = either (error . show) id program'
+  let outputs = Outputs $ singleton p2 $ singleton (Variable "b") b
+  let (observed, _) = deterministicEvaluation program (Inputs empty) (Tapes empty)
+  return $ outputs === observed
+
 example :: Test
 example = testProperty "An easy example" $ (outputs, views) === deterministicEvaluation program inputs tapes
   where program :: Program Located
@@ -164,3 +180,30 @@ pipeline = testProperty "3partyXOR.cho gives correct outputs" $ ioProperty do
     let outputs = Outputs $ fromList $ [c, h1, h2] `zip` repeat (singleton (Variable "y") y)
     let (observed, _) = deterministicEvaluation program inputs tapes
     return $ observed === outputs
+
+oneOfFourOT :: Test
+oneOfFourOT = testProperty "1-of-4 Oblivious Transfer" $ ioProperty oneOfFourOTIO
+oneOfFourOTIO :: IO (Gen Property)
+oneOfFourOTIO = do
+  program' <- parseFromFile (changeState (const ()) (const empty) programParser) "examples/1of4OT.cho"
+  let program = either (error . show) id program'
+  return do  -- The Gen Monad!
+    messages <- vectorOf 4 (arbitrary @Bool)
+    selection <- chooseInt (0,3)
+    let sAsBits = [odd selection, 2 <= selection]
+    let inputs = Inputs $ fromList $ [Variable "option_00"
+                                     ,Variable "option_01"
+                                     ,Variable "option_10"
+                                     ,Variable "option_11"
+                                     ,Variable "choice_i1"
+                                     ,Variable "choice_i2"] `zip` (messages <> sAsBits)
+    randomness <- vectorOf 4 (arbitrary @Bool)
+    let tapes = Tapes $ fromList $ [Variable "k1_0"
+                                   ,Variable "k1_1"
+                                   ,Variable "k2_0"
+                                   ,Variable "k2_1"] `zip` randomness
+    let y = messages !! selection
+    let outputs = Outputs $ fromList $ [p2] `zip` repeat (singleton (Variable "final") y)
+    let (vc, (observed, _)) = deterministicEvaluation' program inputs tapes
+    return $ counterexample (pretty vc) $ observed == outputs
+

@@ -3,16 +3,16 @@ where
 
 import Data.Bool (bool)
 import Data.Foldable (traverse_)
-import Data.Map.Strict ((!?), empty, insert, Map, singleton, unionWith)
+import Data.Map.Strict ((!?), empty, insert, Map, singleton, unionWith, toList)
 import Data.Maybe (fromMaybe, fromJust)
 import Polysemy (Members, run, Sem)
 import Polysemy.Reader (asks, Reader, runReader)
-import Polysemy.State (evalState, gets, modify, State)
+import Polysemy.State (gets, modify, runState, State)
 import Polysemy.Writer (runWriter, tell, Writer)
 
 import Choreography.Party (intersect, Party(..), PartySet(..))
 import Choreography.AbstractSyntaxTree
-import Utils ((<$$>))
+import Utils ((<$$>), Pretty, pretty)
 
 class NS ns a | ns -> a where
   find :: ns -> Variable -> Maybe a
@@ -22,6 +22,10 @@ newtype VarContext = VarContext { varContextMap :: Map Variable (PartySet, Bool)
 instance NS VarContext (PartySet, Bool) where
   find = (!?) . varContextMap
   bind v a = VarContext . insert v a . varContextMap
+instance Pretty VarContext where
+  pretty (VarContext vcm) = unlines $ (\(var, (ps, b))
+      -> "  " ++ pretty var ++ ": " ++ pretty b ++ " @ " ++ pretty ps
+    )  <$> toList vcm
 
 newtype Inputs = Inputs { inputsMap :: Map Variable Bool } deriving (Eq, Monoid, Semigroup, Show)
 instance NS Inputs Bool where
@@ -157,12 +161,17 @@ algSemantics (And a1 a2) = do (ps1, v1) <- algSemantics $ value a1
                               return (fromJust $ ps1 `intersect` ps2, v1 && v2)
 algSemantics (Not alg) = do not <$$> algSemantics (value alg)
 
-deterministicEvaluation :: (Proper f, Functor f) =>
-                           Program f -> Inputs -> Tapes -> (Outputs, Views)
-deterministicEvaluation p is ts =
-  let (views, (outputs, ())) = run . evalState (VarContext empty)
+deterministicEvaluation' :: (Proper f, Functor f) =>
+                            Program f -> Inputs -> Tapes -> (VarContext, (Outputs, Views))
+deterministicEvaluation' p is ts =
+  let (vc, (views, (outputs, ()))) = run . runState (VarContext empty)
                                    . runWriter @Views . runWriter @Outputs
                                    . runReader ts . runReader is
                                    $ semantics p
-  in (outputs, views)
+  in (vc, (outputs, views))
 
+deterministicEvaluation :: (Proper f, Functor f) =>
+                           Program f -> Inputs -> Tapes -> (Outputs, Views)
+deterministicEvaluation p is ts =
+  let (_, ret) = deterministicEvaluation' p is ts
+  in ret
