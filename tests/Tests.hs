@@ -10,7 +10,6 @@ import Text.Parsec.String (parseFromFile)
 import Choreography.AbstractSyntaxTree
 import Choreography.Parser hiding (owners)
 import Choreography.Party
---import Choreography.EasySyntaxTree (compileSem)
 import Choreography.Semantics
 import Utils
 import Data.List (nub)
@@ -79,15 +78,18 @@ testEasyObliv :: Test
 testEasyObliv = testProperty "Easy Obliv" $ case sec of
     Oblivious (Location bindOs _, boundVar)
               (Location forOs _, forPs)
-              (Location chooseOs _, choVar)
-              ((Location frVTOs _, tVar), (Location frVFOs _, fVar))
-      | [p2] == (nub . concat $ Set.toList . parties <$> [bindOs, forOs, forPs, chooseOs, o2])
-        && null (nub . concat $ Set.toList . parties <$> [frVFOs, frVTOs])
-        && [Variable "a"] == nub [choVar, fVar, tVar]
+              (Location outerOs _, ObvBody (Location from0 _, ObvLeaf var0)
+                                           (Location from1 _, ObvBranch (ObvBody (Location from10 _, ObvLeaf var10)
+                                                                                 (Location from11 _, ObvLeaf var11)
+                                                                                 (Location toInner _, innerSelect)))
+                                           (Location toOuter _, outerSelect))
+      | [p2] == (nub . concat $ Set.toList . parties <$> [bindOs, forOs, forPs, o2])
+        && null (nub . concat $ Set.toList . parties <$> [outerOs, from0, from1, from10, from11, toOuter, toInner])
+        && [Variable "a"] == nub [var0, var10, var11, outerSelect, innerSelect]
         && Variable "b" == boundVar
         -> True
     _ -> error (show sec)
-  where sec' = runParser expressionParser (singleton (Variable "a") top) "hardcoded example" "b = OBLIVIOUSLYBY a CHOOSE a a FOR P2"
+  where sec' = runParser expressionParser (singleton (Variable "a") top) "hardcoded example" "b = OBLIVIOUSLY [a, [a,a]?a]?a FOR P2"
         sec :: Statement Located
         (Location o2 _, sec) = case sec' of
           Right r -> r
@@ -131,7 +133,7 @@ testObliv = testProperty "Test Obliv" $ do -- the gen monad
         \a = " ++ pretty b ++ "\n\
         \yes = 1\n\
         \no = 0\n\
-        \b = OBLIVIOUSLYBY a CHOOSE yes no FOR P2\n\
+        \b = OBLIVIOUSLY [no,yes]?a FOR P2\n\
         \OUTPUT b"
   let program = either (error . show) id program'
   let outputs = Outputs $ singleton p2 $ singleton (Variable "b") b

@@ -36,12 +36,27 @@ instance (Pretty1 f, Functor f) => Pretty (Algebra f) where
   pretty (And fa1 fa2) = unwords [pretty fa1, head andNames, pretty fa2]
   pretty (Not fa) = unwords [head notNames, pretty fa]
 
+data ObvBody f = ObvBody (f (ObvChoice f)) (f (ObvChoice f)) (f Variable)
+deriving instance (forall a. (Show a) => Show (f a)) => Show (ObvBody f)
+data ObvChoice f = ObvLeaf Variable
+                 | ObvBranch (ObvBody f)
+deriving instance (forall a. (Show a) => Show (f a)) => Show (ObvChoice f)
+oblivSymbols :: [String]
+oblivSymbols = ["[ ", ", ", " ]"]
+choiceKeyword :: String
+choiceKeyword = "?"
+instance (Pretty1 f, Functor f) => Pretty (ObvBody f) where
+  pretty (ObvBody fc0 fc1 fv) = head oblivSymbols ++ pretty fc0 ++ oblivSymbols !! 1 ++ pretty fc1 ++ oblivSymbols !! 2
+                                ++ choiceKeyword ++ pretty fv
+instance (Pretty1 f, Functor f) => Pretty (ObvChoice f) where
+  pretty (ObvLeaf v) = pretty v
+  pretty (ObvBranch body) = pretty body
+
 data Statement f = Compute (f Variable) (f (Algebra f))
                  | Secret (f Variable) (f Party)
                  | Flip (f Variable) (f Party)
                  | Send (f PartySet) (f Variable)
-                 | Oblivious (f Variable) (f PartySet) (f Variable) (f Variable, f Variable)
-                 --           bound        for          chooseby     true        false
+                 | Oblivious (f Variable) (f PartySet) (f (ObvBody f))
                  | Output (f Variable)
 deriving instance (forall a. (Show a) => Show (f a)) => Show (Statement f)
 bindKeyword :: String
@@ -55,7 +70,7 @@ flipKeyword = "FLIP"
 sendKeywords :: [String]
 sendKeywords = ["SEND", "TO"]
 oblivKeywords :: [String]
-oblivKeywords = ["OBLIVIOUSLYBY", "CHOOSE", "FOR"]
+oblivKeywords = ["OBLIVIOUSLY", "FOR"]
 outputKeyword :: String
 outputKeyword = "OUTPUT"
 instance (Pretty1 f, Functor f) => Pretty (Statement f) where
@@ -66,15 +81,12 @@ instance (Pretty1 f, Functor f) => Pretty (Statement f) where
                                   pretty fv,
                                   sendKeywords !! 1,
                                   pretty fps]
-  pretty (Oblivious fvb fps fvc fvs) = unwords [pretty fvb,
-                                                pretty bindKeyword,
-                                                head oblivKeywords,
-                                                pretty fvc,
-                                                oblivKeywords !! 1,
-                                                pretty $ fst fvs,
-                                                pretty $ snd fvs,
-                                                oblivKeywords !! 2,
-                                                pretty fps]
+  pretty (Oblivious fv fps fb) = unwords [pretty fv,
+                                      pretty bindKeyword,
+                                      head oblivKeywords,
+                                      pretty fb,
+                                      oblivKeywords !! 1,
+                                      pretty fps]
   pretty (Output fv) = unwords [outputKeyword, pretty fv]
 
 type Program f = [f (Statement f)]
@@ -85,3 +97,10 @@ class Proper f where
 instance Proper ((,) PartySet) where
   owners = fst
   value = snd
+
+
+gatherSelectionVars :: (Foldable f) => ObvBody f -> [Variable]
+gatherSelectionVars (ObvBody fc0 fc1 fv) = concatMap (:[]) fv <> concatMap gBranch fc0 <> concatMap gBranch fc1
+  where gBranch (ObvLeaf _) = []
+        gBranch (ObvBranch body) = gatherSelectionVars body
+

@@ -1,12 +1,10 @@
-{-# OPTIONS_GHC -Wno-orphans #-}
-
 module Choreography.Parser
 where
 
+import Data.Foldable (traverse_)
 import Data.Functor.Identity (Identity(..))
 import Data.List (intercalate, nub)
-import Data.Map.Strict ((!?), Map, insert)
-import Data.Maybe (isNothing)
+import Data.Map.Strict ((!), (!?), Map, insert)
 import Data.Set (fromList, singleton)
 import Text.Parsec
 import Text.Parsec.Expr
@@ -34,36 +32,39 @@ asProper (Improper{isource=source, iowners=Just owners}, obj) = return (Location
 asProper (Improper{isource=source, iowners=Nothing}, obj) = do setPosition source
                                                                parserFail $ "Unable to locate " ++ pretty obj
                                                                             ++ " among parties; nobody could do that computation."
-locateAlgebra :: ILocated (Algebra ILocated) -> Parser (Located (Algebra Located))
-locateAlgebra (improper, ialg) = do lalg <- recurse ialg
+class ForceLocation alg where
+  locate :: alg ILocated -> Parser (alg Located)
+forceLocation :: (ForceLocation alg, Pretty (alg Located)) => ILocated (alg ILocated) -> Parser (Located (alg Located))
+forceLocation (improper, ialg) = do lalg <- locate ialg
                                     asProper (improper, lalg)
-  where recurse (Literal fb) = Literal <$> asProper fb
-        recurse (Var fvar) = Var <$> asProper fvar
-        recurse (Xor fa1 fa2) = do la1 <- locateAlgebra fa1
-                                   la2 <- locateAlgebra fa2
-                                   return $ Xor la1 la2
-        recurse (And fa1 fa2) = do la1 <- locateAlgebra fa1
-                                   la2 <- locateAlgebra fa2
-                                   return $ And la1 la2
-        recurse (Not falg) = Not <$> locateAlgebra falg
+instance ForceLocation Algebra where
+  locate (Literal fb) = Literal <$> asProper fb
+  locate (Var fvar) = Var <$> asProper fvar
+  locate (Xor fa1 fa2) = do la1 <- forceLocation fa1
+                            la2 <- forceLocation fa2
+                            return $ Xor la1 la2
+  locate (And fa1 fa2) = do la1 <- forceLocation fa1
+                            la2 <- forceLocation fa2
+                            return $ And la1 la2
+  locate (Not falg) = Not <$> forceLocation falg
+instance ForceLocation ObvBody where
+  locate (ObvBody fc0 fc1 fv) = do lc0 <- forceLocation fc0
+                                   lc1 <- forceLocation fc1
+                                   lv <- asProper fv
+                                   return $ ObvBody lc0 lc1 lv
+instance ForceLocation ObvChoice where
+  locate (ObvLeaf var) = return $ ObvLeaf var
+  locate (ObvBranch body) = ObvBranch <$> locate body
 
 
 type Parser = ParsecT String (Map Variable PartySet) Identity
---instance Distributive Parser where
-{-distributeF :: (a -> Parser b) -> Parser (a -> b)
-distributeF f = mkPT \st@State{stateInput=str, statePos=pos, stateUser=namespace}
-                          -> Identity (Empty (Identity (Ok (
-                               \a -> case runParsecT (f a) st of
-                                 Identity (Consumed (Identity (Ok b st pe))) -> b
-                                 Identity (Empty    (Identity (Ok b st pe))) -> b
-                             ) st (unknownError st))))-}
 
 positioned :: Parser a -> Parser (SourcePos, a)
 positioned p = do source <- getPosition
                   (source,) <$> p
 
 opNames :: [String]
-opNames = [bindKeyword, atKeyword, secretKeyword, flipKeyword, outputKeyword]
+opNames = [bindKeyword, atKeyword, secretKeyword, flipKeyword, outputKeyword, choiceKeyword]
           <> sendKeywords
           <> oblivKeywords
           <> xorNames
@@ -131,6 +132,18 @@ algebraParser = buildExpressionParser ops terms <?> "Algebra"
                ,[Infix (do (isource, _) <- chooseOf reservedOp andNames
                            return $ biOpParser And isource) AssocLeft] ]
 
+-- Define parser for Oblivious terms
+obvTransferParser :: Parser (ILocated (ObvBody ILocated))
+obvTransferParser = do let branchParser = (asImproper <$> (ObvLeaf <$$> boundVariable))
+                                          <|> (ObvBranch <$$> obvTransferParser)
+                       (isource, [choice0@(o0, _), choice1@(o1, _)]) <- positioned
+                                                                        $ brackets tokenizer
+                                                                        $ branchParser `sepBy` (char ',' >> whiteSpace tokenizer)
+                       reservedOp tokenizer choiceKeyword
+                       selectionVar <- boundVariable
+                       return (Improper{isource, iowners = iowners o0 >>= (iowners o1 >>=) . intersect},
+                               ObvBody choice0 choice1 $ asImproper selectionVar)
+
 -- Define parser for Expression
 expressionParser :: Parser (Located (Statement Located))
 expressionParser =  sendParser <|> outputParser <|> bindingParser
@@ -149,26 +162,19 @@ expressionParser =  sendParser <|> outputParser <|> bindingParser
                              return (os, Flip (Location{owners=os, source}, boundVar) owner),
                           -- Oblivious Transfer Parser:
                           do reservedOp tokenizer (head oblivKeywords)
-                             (locC@Location{owners=possiblePTo}, varc) <- boundVariable
+                             lbody@(_, body) <- obvTransferParser >>= forceLocation
                              reservedOp tokenizer (oblivKeywords !! 1)
-                             (loc1@Location{owners=o1}, var1) <- boundVariable
-                             (loc2@Location{owners=o2}, var2) <- boundVariable
-                             let mPFrom = o1 `intersect` o2
-                             reservedOp tokenizer (oblivKeywords !! 2)
                              lpTo@(_, pTo) <- partiesParser
-                             if not (pTo `isSubsetOf` possiblePTo) then
-                               parserFail $ "Parties " ++ pretty pTo ++ " cannot choose choose obliviously by "
-                                             ++ pretty varc ++ ", they don't all own it."
-                             else if isNothing mPFrom then
-                               parserFail $ "Nobody can obliviously send both " ++ pretty var1 ++ " and " ++ pretty var2 ++ "."
-                             else do
-                               let Just pFrom = mPFrom
-                                   lvarc = (locC{owners=pTo}, varc)
-                                   lvar1 = (loc1{owners=pFrom}, var1)
-                                   lvar2 = (loc2{owners=pFrom}, var2)
-                               return (pTo, Oblivious (Location{owners=pTo, source}, boundVar) lpTo lvarc (lvar1, lvar2)),
+                             traverse_ (\var ->
+                                 do possiblePTo <- (! var) <$> getState
+                                    if pTo `isSubsetOf` possiblePTo
+                                    then return ()
+                                    else parserFail $ "Parties " ++ pretty pTo ++ " cannot choose choose obliviously by "
+                                                       ++ pretty var ++ "; they don't all own it."
+                               ) $ gatherSelectionVars body
+                             return (pTo, Oblivious (Location{owners=pTo, source}, boundVar) lpTo lbody),
                           -- Compute Parser:
-                          do alg@(Location{owners=os}, _) <- algebraParser >>= locateAlgebra
+                          do alg@(Location{owners=os}, _) <- algebraParser >>= forceLocation
                              return (os, Compute (Location{owners=os, source}, boundVar) alg)
                         ]
                        modifyState $ insert boundVar owners

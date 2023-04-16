@@ -47,12 +47,6 @@ instance Semigroup Views where
   Views om1 <> Views om2 = Views $ unionWith (<>) om1 om2
 instance Monoid Views where mempty = Views empty
 
-{-throwLn :: forall l a r.
-           (Members '[Error String] r
-           ,Proper l) =>
-           l String -> Sem r a
-throwLn err = do ln <- tag $ ask @SourcePos
-                 throw $ "[Line " ++ show ln ++ "] " ++ err-}
 
 -- Unsafe Lookup
 uslkup :: forall ns f a.
@@ -63,21 +57,6 @@ fv `uslkup` ns = fromMaybe
   (error $ "Free variable " ++ variable (value fv) ++ " appeared during evaluation.")
   (ns `find` value fv)
 
-{-asks :: forall ns f a r.
-        (NS ns,
-         Proper f,
-         Members '[Reader ns] r) =>
-        f Variable -> Sem r a
-asks var = asks >>= (`uslkup` var)
-
-gets :: forall ns f r.
-        (NS ns,
-         Proper f, Functor f,
-         Members '[State ns
-                  ,Error (f String)] r) =>
-        f Variable -> Sem r Bool
-gets var = do ns <- namespace <$> get @ns
-              snd <$> ns `uslkup` var-}
 
 semantics :: forall f r.
              (Members '[
@@ -87,7 +66,7 @@ semantics :: forall f r.
                Writer Views,
                State VarContext
                ] r,
-              Proper f, Functor f) =>
+              Proper f, Functor f, Traversable f) =>
              Program f -> Sem r ()
 semantics = traverse_ stmtSemantics
 
@@ -99,7 +78,7 @@ stmtSemantics :: forall f r.
                    Writer Views,
                    State VarContext
                    ] r,
-                  Proper f, Functor f) =>
+                  Proper f, Functor f, Traversable f) =>
                  f (Statement f) -> Sem r ()
 stmtSemantics fs = case value fs of
     Compute var falg -> do val <- algSemantics (value falg)
@@ -116,30 +95,20 @@ stmtSemantics fs = case value fs of
                      if null $ parties ps
                      then error "Not implemented: Output at partyset Top!"
                      else traverse_ (\party -> tell $ Outputs $ singleton party (singleton (value var) val)) $ parties ps
-    Oblivious var p2s vc (vt, vf) -> do (_, valc) <- gets $ uslkup vc
-                                        let vSend = bool vf vt valc
-                                        (_, val) <- gets $ uslkup vSend
-                                        modify $ bind (value var) (value p2s, val)
-                                        recordViews (value var) val (value p2s)
+    Oblivious var p2s body -> do let semanticBody (ObvBody fc0 fc1 fv) = do (_, selection) <- gets $ uslkup fv
+                                                                            sequence $ semanticChoice <$> bool fc0 fc1 selection
+                                     semanticChoice :: ObvChoice f -> Sem r Variable
+                                     semanticChoice (ObvLeaf vLeaf) = return vLeaf
+                                     semanticChoice (ObvBranch bdy) = value <$> semanticBody bdy
+                                 vSend <- semanticBody $ value body
+                                 (_, val) <- gets $ uslkup vSend
+                                 modify $ bind (value var) (value p2s, val)
+                                 recordViews (value var) val (value p2s)
   where recordViews :: Variable -> Bool -> PartySet -> Sem r ()
         recordViews var b = traverse_ (\party -> tell
             Views{viewsMap = singleton party $ singleton var b}
           ) . parties
-    {-
-    Send p2 alg -> if party == p2
-        then do (val, _) <- algSemantics alg
-                modify $ insert var val
-                tell . Views $ singleton var val
-        else throwLn "Party-mismatched in send-receipient binding."
-    Output alg -> do
-        (val, p) <- algSemantics alg
-        if party == p
-          then do modify $ insert var val
-                  tell . Outputs $ singleton var val
-          else throwLn $ "Output "
-                       ++ variable ++ " is not in " ++ show party ++ "'s namespace."
-  where bindVar :: f Variable -> (PartySet, Bool) -> Sem r ()
-        bindVar var evaluated = modify $ bind (value var) evaluated-}
+
 
 algSemantics :: forall f r.
                  (Members '[
@@ -161,7 +130,7 @@ algSemantics (And a1 a2) = do (ps1, v1) <- algSemantics $ value a1
                               return (fromJust $ ps1 `intersect` ps2, v1 && v2)
 algSemantics (Not alg) = do not <$$> algSemantics (value alg)
 
-deterministicEvaluation' :: (Proper f, Functor f) =>
+deterministicEvaluation' :: (Proper f, Functor f, Traversable f) =>
                             Program f -> Inputs -> Tapes -> (VarContext, (Outputs, Views))
 deterministicEvaluation' p is ts =
   let (vc, (views, (outputs, ()))) = run . runState (VarContext empty)
@@ -170,7 +139,7 @@ deterministicEvaluation' p is ts =
                                    $ semantics p
   in (vc, (outputs, views))
 
-deterministicEvaluation :: (Proper f, Functor f) =>
+deterministicEvaluation :: (Proper f, Functor f, Traversable f) =>
                            Program f -> Inputs -> Tapes -> (Outputs, Views)
 deterministicEvaluation p is ts =
   let (_, ret) = deterministicEvaluation' p is ts
