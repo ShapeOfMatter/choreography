@@ -28,7 +28,8 @@ tests = do return [ tautology
                   , testObliv
                   , example
                   , pipeline
-                  , oneOfFourOT]
+                  , oneOfFourOT
+                  , gmwAndGates]
 
 
 tautology :: Test
@@ -208,4 +209,27 @@ oneOfFourOTIO = do
     let outputs = Outputs $ fromList $ [p2] `zip` repeat (singleton (Variable "final") y)
     let (vc, (observed, _)) = deterministicEvaluation' program inputs tapes
     return $ counterexample (pretty vc) $ observed == outputs
+
+gmwAndGates :: Test
+gmwAndGates = testProperty "Two party three-arg AND in GMW" $ ioProperty gmwAndGatesIO
+gmwAndGatesIO :: IO (Gen Property)
+gmwAndGatesIO = do
+  program' <- parseFromFile (changeState (const ()) (const empty) programParser) "examples/3party2andGMW.cho"
+  let program = either (error . show) id program'
+  return do  -- The Gen Monad!
+    secrets <- vectorOf 3 (arbitrary @Bool)
+    let inputs = Inputs $ fromList $ [Variable "c_in"
+                                     ,Variable "h1_in"
+                                     ,Variable "h2_in"] `zip` secrets
+    randomness <- vectorOf 5 (arbitrary @Bool)
+    let tapes = Tapes $ fromList $ [Variable "c_s1"
+                                   ,Variable "h1_s1"
+                                   ,Variable "h2_s1"
+                                   ,Variable "g1_s1"
+                                   ,Variable "g2_s2"] `zip` randomness
+    let y = and secrets
+    let outputs = Outputs $ fromList $ [p1, p2] `zip` repeat (singleton (Variable "y") y)
+    let (vc, (observed, _)) = deterministicEvaluation' program inputs tapes
+    return $ counterexample (pretty vc) $ observed == outputs
+
 
