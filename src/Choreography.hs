@@ -3,6 +3,7 @@ module Choreography (
   --module Choreography.EasySyntaxTree,
   module Choreography.Parser,
   module Choreography.Party,
+  module Choreography.Python,
   module Choreography.Semantics
 )
 where
@@ -11,4 +12,5 @@ import Choreography.AbstractSyntaxTree
 --import Choreography.EasySyntaxTree
 import Choreography.Parser hiding (owners)
 import Choreography.Party
+import Choreography.Python
 import Choreography.Semantics

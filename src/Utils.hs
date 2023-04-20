@@ -5,6 +5,8 @@ import Control.Exception (evaluate, Exception, try)
 import Data.Either (fromRight)
 import Data.Functor.Identity (Identity (runIdentity))
 import Data.Map.Strict (adjust, Map)
+import qualified Language.Haskell.TH as TH
+import qualified Language.Haskell.TH.Quote as THQuote
 import Polysemy (Sem)
 import Polysemy.Fail (Fail, runFail)
 import Text.Parsec hiding (try)
@@ -86,3 +88,12 @@ throwsException ioa = do eea <- try ioa
                          either (const @(IO Bool) @e (return True)) (
                              fmap (either (const @Bool @e True) (const False)) . try . evaluate
                            ) eea
+
+-- https://stackoverflow.com/a/12717160/10135377
+-- Takes one arg: a file name.
+litFile :: THQuote.QuasiQuoter
+litFile = THQuote.quoteFile $ THQuote.QuasiQuoter{ THQuote.quoteExp = return . TH.LitE . TH.StringL
+                                                 , THQuote.quotePat=undefined
+                                                 , THQuote.quoteType=undefined
+                                                 , THQuote.quoteDec=undefined }
+

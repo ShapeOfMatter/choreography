@@ -1,6 +1,28 @@
 module Main where
 
-import Choreography.AbstractSyntaxTree ()
+import Data.Map.Strict (fromList, toList)
+import Text.Parsec.String (parseFromFile)
+import System.Environment (getArgs)
+import Test.QuickCheck (arbitrary, vectorOf)
+import Test.QuickCheck.Gen (generate)
+
+import Choreography
+import Utils
+import Python
 
 main :: IO ()
-main = do putStrLn "Hello, Haskell!"
+main = do
+  programFile : fixedInputs <- getArgs
+  program' <- parseFromFile (changeState (const ()) (const mempty) programParser) programFile
+  let program = either (error . show) id program'
+  let (_, ProgramMetaData{inputVars, tapeVars}) = asPythonFunction top program
+  let secrets = (toEnum . read @Int <$> fixedInputs) <> repeat True
+  let inputs = Inputs $ fromList $ concat inputVars `zip` secrets
+  putStrLn $ "Inputs:  " ++ show (toList $ inputsMap inputs)
+  randomness <- generate $ vectorOf (sum $ length <$> tapeVars) (arbitrary @Bool)
+  let tapes = Tapes $ fromList $ concat tapeVars `zip` randomness
+  putStrLn $ "Tapes:  " ++ show (toList $ tapesMap tapes)
+  (os, vs, code) <- runPythonProgram program inputs tapes
+  writeFile ".temp.py" $ asString code
+  putStrLn $ "Views:  " ++ show (toList $ toList <$> viewsMap vs)
+  putStrLn $ "Outputs:  " ++ show (toList $ toList <$> outputsMap os)

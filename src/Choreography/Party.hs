@@ -41,6 +41,10 @@ isSubsetOf :: PartySet -> PartySet -> Bool
                                          | null ps1 = False  -- unless masked by null ps2!
                                          | otherwise = ps1 `Set.isSubsetOf` ps2
 
+isElementOf :: Party -> PartySet -> Bool
+p `isElementOf` (Parties ps) | null ps = True
+                             | otherwise = p `Set.member` ps
+
 p1 :: Party
 p1 = Party "P1"  -- "ℙ𝟙"
 p2 :: Party

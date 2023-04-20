@@ -36,6 +36,7 @@ common basic-config
                      ,polysemy ^>= 1.9
                      ,process >=1.1.0.2 && <1.7
                      ,QuickCheck ^>= 2.14
+                     ,template-haskell >= 2.16.0.0
     ghc-options:
       -Wall
       -fprint-potential-instances
@@ -90,6 +91,7 @@ library
       --Choreography.EasySyntaxTree
       Choreography.Parser
       Choreography.Party
+      Choreography.Python
       Choreography.Semantics
       Distribution.TestSuite.QuickCheck
       Python
