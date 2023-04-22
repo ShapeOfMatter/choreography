@@ -151,11 +151,6 @@ example = testProperty "An easy example" $ (outputs, views) === deterministicEva
         \SEND comp1 TO P1\n\
         \y = rand ^ comp1\n\
         \OUTPUT y"
-        {-program' = [(0, Variable p1 "rand", Flip p1)
-                  ,(1, Variable p2 "sec", Secret p2)
-                  ,(2, Variable p2 "comp1", Compute $ Not $ Xor (Var $ Variable p2 "sec") (Literal p2 True))
-                  ,(3, Variable p1 "m1", Send p1 $ Var $ Variable p2 "comp1")
-                  ,(4, Variable p1 "y", Output $ And (Var $ Variable p1 "rand") (Var $ Variable p1 "m1"))]-}
         inputs = Inputs $ singleton (Variable "sec") True
         tapes = Tapes $ singleton (Variable "rand") True
         views = Views $ fromList [(p1, fromList[(Variable "comp1", True),

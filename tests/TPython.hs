@@ -1,8 +1,10 @@
 module TPython where
 
-import Data.Map.Strict (fromList, singleton, toList)
+import Data.Map.Strict (fromList, toList)
+import qualified Data.Set as Set
 import Distribution.TestSuite.QuickCheck
-import Test.QuickCheck (arbitrary, Gen, ioProperty, Property, vectorOf, counterexample)
+import Test.QuickCheck (arbitrary, Gen, ioProperty, Property, vectorOf, counterexample, expectFailure)
+import Text.Parsec (runParser)
 import Text.Parsec.String (parseFromFile)
 
 import Choreography
@@ -13,7 +15,9 @@ tests :: IO [Test]
 tests = do return [ testHealth
                   , antiHealth
                   , exampleFromFile
-                  , gmwAndGates]
+                  , gmwAndGates
+                  , insecureProg
+                  , secureProg]
 
 
 testHealth :: Test
@@ -58,3 +62,26 @@ gmwAndGatesIO = do
                       "outputs = " ++ show (concat $ toList <$> outputsMap os),
                       "expected views = " ++ show (concat $ toList <$> outputsMap outputs)]
       return $ counterexample (unlines messages) $ os == outputs && vs == views
+
+insecureProg :: Test
+insecureProg = testProperty "Insecure program gives low p-value." $ ioProperty do
+    pValue <- runDTreeTest (Parties $ Set.singleton p2) 14 100 100 program
+    return $ pValue < 0.05
+  where program :: Program Located
+        Right program = runParser programParser mempty "hardcode example" "\
+          \rand = FLIP @P1\n\
+          \sec = SECRET @P1\n\
+          \SEND rand TO P2\n\
+          \SEND sec TO P2\n\
+          \OUTPUT rand"
+
+secureProg :: Test
+secureProg = testProperty "Secure program gives a random p-value." $ expectFailure $ ioProperty do
+    pValue <- runDTreeTest (Parties $ Set.singleton p2) 14 100 100 program
+    return $ pValue < 0.05
+  where program :: Program Located
+        Right program = runParser programParser mempty "hardcode example" "\
+          \rand = FLIP @P1\n\
+          \sec = SECRET @P1\n\
+          \SEND rand TO P2\n\
+          \OUTPUT rand"

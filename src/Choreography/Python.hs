@@ -2,11 +2,11 @@
 module Choreography.Python where
 
 import Data.Bool (bool)
-import Data.Foldable (fold, traverse_)
+import Data.Foldable (traverse_)
 import Data.List (intercalate, elemIndex, nub)
-import Data.Map.Strict ((!), empty, foldMapWithKey, fromList, Map, singleton, toAscList, toList, unionWith, null)
+import Data.Map.Strict ((!), fromList, Map, toAscList, toList, unionWith)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromJust, isJust, isNothing)
+import Data.Maybe (fromJust, isJust)
 import qualified Data.Set as Set
 import Polysemy (Members, run, Sem)
 import Polysemy.Writer (runWriter, tell, Writer)
@@ -151,3 +151,7 @@ decisionTreeTest ps treesN trainingN testingN prog = (header
           ] ++ ")"
         (corrupt, honest) = ("False", "True")
         var `looksCorruptIn` mapping = isJust $ ps `intersect` (Parties . Set.fromList . fmap fst . toList . Map.filter (elem var) $ mapping)
+
+runDTreeTest :: (Proper f, Functor f, Traversable f, Pretty1 f) => PartySet -> Int -> Int -> Int -> Program f -> IO Double
+runDTreeTest ps treesN trainingN testingN prog = runPythonCommand @Double code
+  where (code, _) = decisionTreeTest ps treesN trainingN testingN prog

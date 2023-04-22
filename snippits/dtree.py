@@ -42,7 +42,8 @@ def perform_test(input_mask, tape_width, views_mask, outputs_mask, training_samp
             delayed(run_iter)(input_mask, tape_width, np.ones_like(views_mask), outputs_mask, training_samples, testing_samples)
             for i in range(iterations)
         )
-    print(ideal_results, real_results)
-    print('T-test result:', ttest_ind(ideal_results, real_results, alternative='less'))
+    #print(ideal_results, real_results)
+    p_value = ttest_ind(ideal_results, real_results, alternative='less').pvalue
+    print('{:6.5f}'.format(p_value))
 
 
