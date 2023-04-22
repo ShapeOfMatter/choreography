@@ -48,8 +48,7 @@ gmwAndGatesIO = do
                                    ,Variable "h2_s1"
                                    ,Variable "g1_s1"
                                    ,Variable "g2_s2"] `zip` randomness
-    let y = and secrets
-    let outputs = Outputs $ fromList $ [p1, p2] `zip` repeat (singleton (Variable "y") y)
+    let (outputs, views) = deterministicEvaluation program inputs tapes
     return $ ioProperty do -- Back in the IO monad!?
       (os, vs, code) <- runPythonProgram program inputs tapes
       let messages = [ asString code,
@@ -58,4 +57,4 @@ gmwAndGatesIO = do
                       "views = " ++ show (concat $ toList <$> viewsMap vs),
                       "outputs = " ++ show (concat $ toList <$> outputsMap os),
                       "expected views = " ++ show (concat $ toList <$> outputsMap outputs)]
-      return $ counterexample (unlines messages) $ os == outputs
+      return $ counterexample (unlines messages) $ os == outputs && vs == views

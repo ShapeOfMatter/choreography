@@ -2,10 +2,11 @@
 module Choreography.Python where
 
 import Data.Bool (bool)
-import Data.Foldable (traverse_)
-import Data.List (intercalate, elemIndex)
-import Data.Map.Strict ((!), empty, foldMapWithKey, fromList, Map, singleton, unionWith)
-import Data.Maybe (fromJust)
+import Data.Foldable (fold, traverse_)
+import Data.List (intercalate, elemIndex, nub)
+import Data.Map.Strict ((!), empty, foldMapWithKey, fromList, Map, singleton, toAscList, toList, unionWith, null)
+import qualified Data.Map.Strict as Map
+import Data.Maybe (fromJust, isJust, isNothing)
 import qualified Data.Set as Set
 import Polysemy (Members, run, Sem)
 import Polysemy.Writer (runWriter, tell, Writer)
@@ -15,7 +16,7 @@ import Choreography.AbstractSyntaxTree
 import Choreography.Party
 import Choreography.Semantics (Inputs, inputsMap, Outputs (Outputs), Tapes, tapesMap, Views(Views))
 import Python
-import Utils (litFile, pretty, Pretty1)
+import Utils ((<$$>), litFile, pretty, Pretty1)
 
 numpy :: String -> PythonExpression
 numpy = ("np." ++)
@@ -26,27 +27,32 @@ n = "n"
 header :: PythonLines
 header = pythonLines [litFile|snippits/header.py|]
 
-data ProgramMetaData = ProgramMetaData { inputVars :: Map Party [Variable]
-                                       , tapeVars :: Map Party [Variable]
+data ProgramMetaData = ProgramMetaData { inputVars :: [(Party, Variable)]
+                                       , tapeVars :: [(Party, Variable)]
                                        , viewVars :: Map Party [Variable]
                                        , outputVars :: Map Party [Variable]
                                        } deriving (Eq, Ord, Show)
 instance Semigroup ProgramMetaData where
   ProgramMetaData ivs1 tvs1 vvs1 ovs1 <>  ProgramMetaData ivs2 tvs2 vvs2 ovs2 =
-    ProgramMetaData (unionWith (<>) ivs1 ivs2) (unionWith (<>) tvs1 tvs2) (unionWith (<>) vvs1 vvs2) (unionWith (<>) ovs1 ovs2)
+    ProgramMetaData (ivs1 <> ivs2) (tvs1 <> tvs2) (unionWith (<>) vvs1 vvs2) (unionWith (<>) ovs1 ovs2)
 instance Monoid ProgramMetaData where
-  mempty = ProgramMetaData empty empty empty empty
+  mempty = ProgramMetaData mempty mempty mempty mempty
 metadata :: ProgramMetaData
 metadata = mempty
 
-at :: (Proper f) => f Variable -> f Party -> Map Party [Variable]
-fv `at` fp = singleton (value fp) [value fv]
+at :: (Proper f) => f Variable -> f Party -> [(Party, Variable)]
+fv `at` fp = [(value fp, value fv)]
 ats :: (Proper f) => f Variable -> PartySet -> Map Party [Variable]
 fv `ats` ps = fromList [(p, [value fv]) | p <- Set.toList . parties $ ps]
 registrationIndex :: (Members '[State ProgramMetaData] r) =>
-                     (ProgramMetaData -> Map Party [Variable]) -> ProgramMetaData -> Sem r Int
+                     (ProgramMetaData -> [(Party, Variable)]) -> ProgramMetaData -> Sem r Int
 registrationIndex func meta = do modify (<> meta)
-                                 gets $ (-1 +) . sum . fmap length . func
+                                 gets $ (-1 +) . length . func
+
+flattenIndicesM :: Map Party [Variable] -> [String]
+flattenIndicesM mpvs = nub . concat $ fmap variable . snd <$> toAscList mpvs
+flattenIndicesL :: [(Party, Variable)] -> [String]
+flattenIndicesL mpvs = variable . snd <$> mpvs
 
 pySemantics :: forall f r.
              (Members '[
@@ -69,7 +75,7 @@ pyStatement fs = do
     (Compute fv falg) -> bindVar fv $ pyAlg falg
     (Secret fv fp) -> do i <- registrationIndex inputVars $ metadata{inputVars = fv `at` fp}
                          bindVar fv $ "inputs" `index` [show i]
-    (Flip fv fp) -> do i <- registrationIndex tapeVars $ metadata{tapeVars = fv `at` fp, viewVars= fv `at` fp}
+    (Flip fv fp) -> do i <- registrationIndex tapeVars $ metadata{tapeVars = fv `at` fp, viewVars= fromList $ (:[]) <$$> (fv `at` fp)}
                        bindVar fv $ "tapes" `index` [show i]
     (Send fps fv) -> do modify (<> metadata{viewVars = fv `ats` value fps})
                         tell . comment . pretty $ value fs
@@ -96,21 +102,18 @@ pyObliv (ObvBody fc0 fc1 fv) = numpy "choose" `apply` [variable $ value fv, "" `
 data PyTrace = PyTrace { inputs :: [Int], tapes :: [Int], outputs :: [Int], views :: [Int] } deriving (Eq, Ord, Read, Show)
 
 asPythonFunction :: (Proper f, Functor f, Traversable f, Pretty1 f) =>
-                    PartySet -> Program f -> (PythonLines, ProgramMetaData)
-asPythonFunction ps prog = (pythonLines [litFile|snippits/procedure_signature.py|]
-                            <> indent 1 pyLines
-                            <> indent 1 gather
-                            <> pythonLines [litFile|snippits/procedure_return.py|]
-                           , pmd)
+                    Program f -> (PythonLines, ProgramMetaData)
+asPythonFunction prog = (pythonLines [litFile|snippits/procedure_signature.py|]
+                         <> indent 1 pyLines
+                         <> indent 1 gather
+                         <> pythonLines [litFile|snippits/procedure_return.py|]
+                         , pmd)
   where (pyLines, (pmd@ProgramMetaData{inputVars, tapeVars, viewVars, outputVars}, ()))
           = run . runWriter . runState mempty $ pySemantics prog
-        gather = pythonLines $ "selected_inputs = [" ++ psFilter inputVars ++ "]\n\
-                               \selected_tapes = [" ++ psFilter tapeVars ++ "]\n\
-                               \selected_views = [" ++ psFilter viewVars ++ "]\n\
-                               \selected_outputs = [" ++ psFilter outputVars ++ "]"
-        psFilter :: Map Party [Variable] -> String
-        psFilter mpsv = intercalate ", " . fmap variable
-                          $ foldMapWithKey (\p vs -> if p `isElementOf` ps then vs else mempty) mpsv
+        gather = pythonLines $ "selected_inputs = [" ++ intercalate "," (flattenIndicesL inputVars) ++ "]\n\
+                               \selected_tapes = [" ++ intercalate "," (flattenIndicesL tapeVars) ++ "]\n\
+                               \selected_views = [" ++ intercalate "," (flattenIndicesM viewVars) ++ "]\n\
+                               \selected_outputs = [" ++ intercalate "," (flattenIndicesM outputVars) ++ "]"
 
 asPythonProgram :: (Proper f, Functor f, Traversable f, Pretty1 f) => Program f -> Inputs -> Tapes -> (PythonLines, ProgramMetaData)
 asPythonProgram prog ins tps = (header
@@ -118,14 +121,33 @@ asPythonProgram prog ins tps = (header
                                 <> setup
                                 <> pythonLines [litFile|snippits/footer.py|]
                                , pmd)
-  where (function, pmd@ProgramMetaData{inputVars, tapeVars}) = asPythonFunction top prog
-        setup = pythonLines $ "inputs = np.array([" ++ intercalate ", " [pretty $ inputsMap ins ! var | var <- concat inputVars] ++ "])\n\
-                              \tapes = np.array([" ++ intercalate ", " [pretty $ tapesMap tps ! var | var <- concat tapeVars] ++ "])"
+  where (function, pmd@ProgramMetaData{inputVars, tapeVars}) = asPythonFunction prog
+        setup = pythonLines $ "inputs = np.array([" ++ intercalate ", " [pretty $ inputsMap ins ! var | (_, var) <- inputVars] ++ "])\n\
+                              \tapes = np.array([" ++ intercalate ", " [pretty $ tapesMap tps ! var | (_, var) <- tapeVars] ++ "])"
 
 runPythonProgram :: (Proper f, Functor f, Traversable f, Pretty1 f) => Program f -> Inputs -> Tapes -> IO (Outputs, Views, PythonLines)
 runPythonProgram prog ins tps = do PyTrace{outputs, views} <- runPythonCommand @PyTrace code
                                    return (Outputs $ outputs `arrange` outputVars, Views $ views `arrange` viewVars, code)
   where (code, ProgramMetaData{outputVars, viewVars}) = asPythonProgram prog ins tps
         arrange :: [Int] -> Map Party [Variable] -> Map Party (Map Variable Bool)
-        vals `arrange` mapping = let vars = concat mapping
+        vals `arrange` mapping = let vars = Variable <$> flattenIndicesM mapping
                                  in fromList . ((\v -> (v, toEnum $ vals !! fromJust (elemIndex v vars))) <$>) <$> mapping
+
+decisionTreeTest :: (Proper f, Functor f, Traversable f, Pretty1 f) => PartySet -> Int -> Int -> Int -> Program f -> (PythonLines, ProgramMetaData)
+decisionTreeTest ps treesN trainingN testingN prog = (header
+                                                      <> function
+                                                      <> pythonLines [litFile|snippits/dtree.py|]
+                                                      <> call
+                                                     , pmd)
+  where (function, pmd@ProgramMetaData{inputVars, tapeVars, viewVars, outputVars}) = asPythonFunction prog
+        call = pythonLines $ "perform_test(" ++ intercalate ", " [
+            "[" ++ intercalate ", " [if p `isElementOf` ps then corrupt else honest | (p, _) <- inputVars] ++ "]",
+            show $ length tapeVars,
+            "[" ++ intercalate ", " [if Variable var `looksCorruptIn` viewVars then corrupt else honest | var <- flattenIndicesM viewVars] ++ "]",
+            "[" ++ intercalate ", " [if Variable var `looksCorruptIn` outputVars then corrupt else honest | var <- flattenIndicesM outputVars] ++ "]",
+            show trainingN,
+            show testingN,
+            show treesN
+          ] ++ ")"
+        (corrupt, honest) = ("False", "True")
+        var `looksCorruptIn` mapping = isJust $ ps `intersect` (Parties . Set.fromList . fmap fst . toList . Map.filter (elem var) $ mapping)
