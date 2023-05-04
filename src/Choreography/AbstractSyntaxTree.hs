@@ -1,6 +1,8 @@
 module Choreography.AbstractSyntaxTree
 where
 
+import Text.Parsec (SourcePos)
+
 import Choreography.Party (Party(..), PartySet)
 import Utils (Pretty, pretty, Pretty1)
 
@@ -91,6 +93,13 @@ instance (Pretty1 f, Functor f) => Pretty (Statement f) where
 
 type Program f = [f (Statement f)]
 
+
+gatherSelectionVars :: (Foldable f) => ObvBody f -> [Variable]
+gatherSelectionVars (ObvBody fc0 fc1 fv) = concatMap (:[]) fv <> concatMap gBranch fc0 <> concatMap gBranch fc1
+  where gBranch (ObvLeaf _) = []
+        gBranch (ObvBranch body) = gatherSelectionVars body
+
+
 class Proper f where
   owners :: f a -> PartySet
   value :: f a -> a
@@ -98,9 +107,11 @@ instance Proper ((,) PartySet) where
   owners = fst
   value = snd
 
+data Location = Location { lowners :: PartySet, source :: SourcePos } deriving (Eq, Ord, Show)
+type Located = (,) Location
+instance Proper Located where
+  owners = lowners . fst
+  value = snd
 
-gatherSelectionVars :: (Foldable f) => ObvBody f -> [Variable]
-gatherSelectionVars (ObvBody fc0 fc1 fv) = concatMap (:[]) fv <> concatMap gBranch fc0 <> concatMap gBranch fc1
-  where gBranch (ObvLeaf _) = []
-        gBranch (ObvBranch body) = gatherSelectionVars body
-
+data Improper = Improper { iowners :: Maybe PartySet, isource :: SourcePos } deriving (Eq, Ord, Show)
+type ILocated = (,) Improper

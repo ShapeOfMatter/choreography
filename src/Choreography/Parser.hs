@@ -10,25 +10,15 @@ import Text.Parsec
 import Text.Parsec.Expr
 import Text.Parsec.Token
 
-import Choreography.AbstractSyntaxTree hiding (owners)
-import qualified Choreography.AbstractSyntaxTree as AST
+import Choreography.AbstractSyntaxTree
 import Choreography.Party
 import Utils ((<$$>), Pretty, pretty)
 
 
-data Location = Location { owners :: PartySet, source :: SourcePos } deriving (Eq, Ord, Show)
-type Located = (,) Location
-instance Proper Located where
-  owners = owners . fst
-  value = snd
-
--- Used so we can first parse an Algebra, and _then_ check if it's valid.
-data Improper = Improper { iowners :: Maybe PartySet, isource :: SourcePos } deriving (Eq, Ord, Show)
-type ILocated = (,) Improper
 asImproper :: Located a -> ILocated a
-asImproper (Location{owners, source}, a) = (Improper{iowners=Just owners, isource=source}, a)
+asImproper (Location{lowners, source}, a) = (Improper{iowners=Just lowners, isource=source}, a)
 asProper :: (Pretty a) => ILocated a -> Parser (Located a)
-asProper (Improper{isource=source, iowners=Just owners}, obj) = return (Location{source, owners}, obj)
+asProper (Improper{isource=source, iowners=Just os}, obj) = return (Location{source, lowners=os}, obj)
 asProper (Improper{isource=source, iowners=Nothing}, obj) = do setPosition source
                                                                parserFail $ "Unable to locate " ++ pretty obj
                                                                             ++ " among parties; nobody could do that computation."
@@ -90,19 +80,19 @@ tokenizer = makeTokenParser LanguageDef {
 partyParser :: Parser (Located Party)
 partyParser = do (source, _) <- positioned $ char '@'
                  party <- Party <$> identifier tokenizer
-                 return (Location{source, owners = Parties $ singleton party}, party)
+                 return (Location{source, lowners = Parties $ singleton party}, party)
 
 partiesParser :: Parser (Located PartySet)
 partiesParser = do let comma = do {whiteSpace tokenizer; _ <- char ','; whiteSpace tokenizer}
-                   (source, owners) <- positioned $ Parties . fromList . (Party <$>) <$> identifier tokenizer `sepBy1` comma
-                   return (Location{source, owners}, owners)
+                   (source, lowners) <- positioned $ Parties . fromList . (Party <$>) <$> identifier tokenizer `sepBy1` comma
+                   return (Location{source, lowners}, lowners)
 
 boundVariable :: Parser (Located Variable)
 boundVariable = do source <- getPosition
                    var <- Variable <$> identifier tokenizer
                    mOwners <- (!? var) <$> getState
                    maybe (parserFail $ "Unbound variable " ++ pretty var ++ ".")
-                         (\owners -> return (Location {owners, source}, var))
+                         (\lowners -> return (Location {lowners, source}, var))
                          mOwners
 
 -- Define parser for Algebra
@@ -151,15 +141,15 @@ expressionParser =  sendParser <|> outputParser <|> bindingParser
     bindingParser :: Parser (Located (Statement Located))
     bindingParser = do (source, boundVar) <- positioned $ Variable <$> identifier tokenizer
                        _ <- reservedOp tokenizer bindKeyword
-                       (owners, stmt :: Statement Located) <- choice [
+                       (lowners, stmt :: Statement Located) <- choice [
                           -- Secret Parser:
                           do reservedOp tokenizer secretKeyword
-                             owner@(Location{owners=os}, _) <- partyParser
-                             return (os, Secret (Location{owners=os, source}, boundVar) owner),
+                             owner@(Location{lowners=os}, _) <- partyParser
+                             return (os, Secret (Location{lowners=os, source}, boundVar) owner),
                           -- Flip Parser:
                           do reservedOp tokenizer flipKeyword
-                             owner@(Location{owners=os}, _) <- partyParser
-                             return (os, Flip (Location{owners=os, source}, boundVar) owner),
+                             owner@(Location{lowners=os}, _) <- partyParser
+                             return (os, Flip (Location{lowners=os, source}, boundVar) owner),
                           -- Oblivious Transfer Parser:
                           do reservedOp tokenizer (head oblivKeywords)
                              lbody@(_, body) <- obvTransferParser >>= forceLocation
@@ -172,20 +162,20 @@ expressionParser =  sendParser <|> outputParser <|> bindingParser
                                     else parserFail $ "Parties " ++ pretty pTo ++ " cannot choose choose obliviously by "
                                                        ++ pretty var ++ "; they don't all own it."
                                ) $ gatherSelectionVars body
-                             return (pTo, Oblivious (Location{owners=pTo, source}, boundVar) lpTo lbody),
+                             return (pTo, Oblivious (Location{lowners=pTo, source}, boundVar) lpTo lbody),
                           -- Compute Parser:
-                          do alg@(Location{owners=os}, _) <- algebraParser >>= forceLocation
-                             return (os, Compute (Location{owners=os, source}, boundVar) alg)
+                          do alg@(Location{lowners=os}, _) <- algebraParser >>= forceLocation
+                             return (os, Compute (Location{lowners=os, source}, boundVar) alg)
                         ]
-                       modifyState $ insert boundVar owners
-                       return (Location{source, owners}, stmt)
+                       modifyState $ insert boundVar lowners
+                       return (Location{source, lowners}, stmt)
     sendParser = do (source, _) <- positioned $ reservedOp tokenizer (head sendKeywords)
-                    var@(Location{owners=pFrom}, v) <- boundVariable
+                    var@(Location{lowners=pFrom}, v) <- boundVariable
                     reservedOp tokenizer (sendKeywords !! 1)
                     lpTo@(_, pTo) <- partiesParser
-                    let owners = pFrom `union` pTo
-                    modifyState $ insert v owners
-                    return (Location {source, owners}, Send lpTo var)
+                    let lowners = pFrom `union` pTo
+                    modifyState $ insert v lowners
+                    return (Location {source, lowners}, Send lpTo var)
     outputParser = do (source, _) <- positioned $ reservedOp tokenizer outputKeyword
                       var@(loc, _) <- boundVariable
                       return (loc{source}, Output var)
