@@ -25,10 +25,17 @@ instance Semigroup PartySet where
 top :: PartySet
 top = Parties empty
 
+singleton :: Party -> PartySet
+singleton = Parties . Set.singleton
+
 union :: PartySet -> PartySet -> PartySet
 (Parties ps1) `union` (Parties ps2) | null ps1 = Parties empty
                                     | null ps2 = Parties empty
                                     | otherwise = Parties $ ps1 `Set.union` ps2
+
+insert :: Party -> PartySet -> PartySet
+p `insert` (Parties ps) | null ps = Parties empty
+                        | otherwise = Parties $ p `Set.insert` ps
 
 intersect :: PartySet -> PartySet -> Maybe PartySet
 (Parties ps1) `intersect` (Parties ps2) | null ps1 = Just $ Parties ps2

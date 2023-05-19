@@ -40,7 +40,7 @@ gmwAndGates = testProperty "Two party three-arg AND in GMW (python)" $ ioPropert
 gmwAndGatesIO :: IO (Gen Property)
 gmwAndGatesIO = do
   program' <- parseFromFile (changeState (const ()) (const mempty) programParser) "examples/3party2andGMW.cho"
-  let program = either (error . show) id program'
+  let program = either error id $ either (error . show) id $ validate mempty <$> program'
   return do  -- The Gen Monad!
     secrets <- vectorOf 3 (arbitrary @Bool)
     let inputs = Inputs $ fromList $ [Variable "c_in"
@@ -68,20 +68,22 @@ insecureProg = testProperty "Insecure program gives low p-value." $ ioProperty d
     pValue <- runDTreeTest (Parties $ Set.singleton p2) 14 100 100 program
     return $ pValue < 0.05
   where program :: Program Located
-        Right program = runParser programParser mempty "hardcode example" "\
+        Right program' =  runParser programParser mempty "hardcode example" "\
           \rand = FLIP @P1\n\
           \sec = SECRET @P1\n\
           \SEND rand TO P2\n\
           \SEND sec TO P2\n\
           \OUTPUT rand"
+        Right program = validate mempty program'
 
 secureProg :: Test
 secureProg = testProperty "Secure program gives a random p-value." $ expectFailure $ ioProperty do
     pValue <- runDTreeTest (Parties $ Set.singleton p2) 14 100 100 program
     return $ pValue < 0.05
   where program :: Program Located
-        Right program = runParser programParser mempty "hardcode example" "\
+        Right program' = runParser programParser mempty "hardcode example" "\
           \rand = FLIP @P1\n\
           \sec = SECRET @P1\n\
           \SEND rand TO P2\n\
           \OUTPUT rand"
+        Right program = validate mempty program'

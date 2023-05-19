@@ -4,13 +4,15 @@ module Choreography (
   module Choreography.Parser,
   module Choreography.Party,
   module Choreography.Python,
-  module Choreography.Semantics
+  module Choreography.Semantics,
+  module Choreography.Validate
 )
 where
 
 import Choreography.AbstractSyntaxTree
 --import Choreography.EasySyntaxTree
-import Choreography.Parser hiding (owners)
+import Choreography.Parser
 import Choreography.Party
 import Choreography.Python
 import Choreography.Semantics
+import Choreography.Validate

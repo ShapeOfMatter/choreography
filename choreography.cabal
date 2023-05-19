@@ -93,6 +93,7 @@ library
       Choreography.Party
       Choreography.Python
       Choreography.Semantics
+      Choreography.Validate
       Distribution.TestSuite.QuickCheck
       Python
       Utils

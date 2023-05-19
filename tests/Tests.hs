@@ -1,5 +1,6 @@
 module Tests where
 
+import Data.List (nub)
 import Data.Map.Strict (fromList, singleton, empty)
 import qualified Data.Set as Set
 import Distribution.TestSuite.QuickCheck
@@ -8,11 +9,12 @@ import Text.Parsec (runParser)
 import Text.Parsec.String (parseFromFile)
 
 import Choreography.AbstractSyntaxTree
-import Choreography.Parser hiding (owners)
-import Choreography.Party
+import Choreography.Parser
+import Choreography.Party hiding (singleton)
+import qualified Choreography.Party as P
 import Choreography.Semantics
+import Choreography.Validate
 import Utils
-import Data.List (nub)
 
 
 tests :: IO [Test]
@@ -40,26 +42,27 @@ testEasyCompute = testProperty "Easy Compute" $ case compute of
     Compute (Location os' _, Variable "a") (_, Literal (_, Bit True)) | os' == os && os == top -> True
     _ -> error (pretty compute)
   where compute :: Statement Located
-        Right (Location os _, compute) = runParser expressionParser empty "hardcoded example" "a = 1"
+        Right [(Location os _, compute)] = validate mempty program
+        Right program = runParser programParser () "hardcoded example" "a = 1"
 
 testEasySecret :: Test
 testEasySecret = testProperty "Easy Secret" $ case sec of
-    Secret (Location os' _, Variable "a") (_, p) | os == os' && os' == Parties (Set.singleton p1) && p == p1 -> True
+    Secret (Location os' _, Variable "a") (_, p) | os == os' && os' == P.singleton p1 && p == p1 -> True
     _ -> error (pretty sec)
-  where sec' = runParser expressionParser empty "hardcoded example" "a = SECRET @P1"
+  where sec' = runParser programParser () "hardcoded example" "a = SECRET @P1"
         sec :: Statement Located
-        (Location os _, sec) = case sec' of
-          Right r -> r
+        Right [(Location os _, sec)] = case sec' of
+          Right r -> validate mempty r
           Left e -> error $ show e
 
 testEasyFlip :: Test
 testEasyFlip = testProperty "Easy Flip" $ case sec of
     Flip (Location os' _, Variable "a") (_, p) | os == os' && os' == Parties (Set.singleton p1) && p == p1 -> True
     _ -> error (pretty sec)
-  where sec' = runParser expressionParser empty "hardcoded example" "a = FLIP @P1"
+  where sec' = runParser programParser () "hardcoded example" "a = FLIP @P1"
         sec :: Statement Located
-        (Location os _, sec) = case sec' of
-          Right r -> r
+        Right [(Location os _, sec)] = case sec' of
+          Right r -> validate mempty r
           Left e -> error $ show e
 
 testEasySend :: Test
@@ -69,10 +72,11 @@ testEasySend = testProperty "Easy Send" $ case sec of
         && [p2] == (nub . concat $ Set.toList . parties <$> [o1'])
         && [p1, p2] == (nub . concat $ Set.toList . parties <$> [o2]) -> True
     _ -> error (show sec)
-  where sec' = runParser expressionParser (singleton (Variable "a") (Parties $ Set.singleton p2)) "hardcoded example" "SEND a TO P1"
+  where context = singleton (Variable "a") (Parties $ Set.singleton p2)
+        sec' = runParser programParser () "hardcoded example" "SEND a TO P1"
         sec :: Statement Located
-        (Location o2 _, sec) = case sec' of
-          Right r -> r
+        Right [(Location o2 _, sec)] = case sec' of
+          Right r -> validate context r
           Left e -> error $ show e
 
 testEasyObliv :: Test
@@ -90,17 +94,18 @@ testEasyObliv = testProperty "Easy Obliv" $ case sec of
         && Variable "b" == boundVar
         -> True
     _ -> error (show sec)
-  where sec' = runParser expressionParser (singleton (Variable "a") top) "hardcoded example" "b = OBLIVIOUSLY [a, [a,a]?a]?a FOR P2"
+  where context = singleton (Variable "a") top
+        sec' = runParser programParser () "hardcoded example" "b = OBLIVIOUSLY [a, [a,a]?a]?a FOR P2"
         sec :: Statement Located
-        (Location o2 _, sec) = case sec' of
-          Right r -> r
+        Right [(Location o2 _, sec)] = case sec' of
+          Right r -> validate context r
           Left e -> error $ show e
 
 testLines :: Test
 testLines = testProperty "Test multi-line program" $ 3 === length program
   where program :: Program Located
-        program = either (error . show) id program'
-        program' = runParser programParser empty "hardcode example" "\
+        program = either error id $ validate mempty $ either (error . show) id program'
+        program' = runParser programParser () "hardcode example" "\
         \a = 1\n\
         \b = 1\n\
         \c = 0"
@@ -108,7 +113,7 @@ testLines = testProperty "Test multi-line program" $ 3 === length program
 testOutput :: Test
 testOutput = testProperty "Test Output" $ (outputs, views) === deterministicEvaluation program inputs tapes
   where program :: Program Located
-        Right program = runParser programParser empty "hardcode example" "\
+        Right (Right program) = validate empty <$> runParser programParser () "hardcode example" "\
         \a = SECRET @P2\n\
         \OUTPUT a"
         inputs = Inputs $ singleton (Variable "a") True
@@ -119,7 +124,7 @@ testOutput = testProperty "Test Output" $ (outputs, views) === deterministicEval
 testSend :: Test
 testSend = testProperty "Test Send" $ (outputs, views) === deterministicEvaluation program inputs tapes
   where program :: Program Located
-        Right program = runParser programParser empty "hardcode example" "\
+        Right (Right program) = validate empty <$> runParser programParser () "hardcode example" "\
         \a = 1\n\
         \SEND a TO P2"
         inputs = Inputs empty
@@ -130,13 +135,13 @@ testSend = testProperty "Test Send" $ (outputs, views) === deterministicEvaluati
 testObliv :: Test
 testObliv = testProperty "Test Obliv" $ do -- the gen monad
   b <- arbitrary @Bool
-  let program' = runParser programParser empty "hardcode example" $ "\
+  let program' = validate empty <$> runParser programParser () "hardcode example" ("\
         \a = " ++ pretty b ++ "\n\
         \yes = 1\n\
         \no = 0\n\
         \b = OBLIVIOUSLY [no,yes]?a FOR P2\n\
-        \OUTPUT b"
-  let program = either (error . show) id program'
+        \OUTPUT b")
+  let program = either error id $ either (error . show) id program'
   let outputs = Outputs $ singleton p2 $ singleton (Variable "b") b
   let (observed, _) = deterministicEvaluation program (Inputs empty) (Tapes empty)
   return $ outputs === observed
@@ -144,7 +149,7 @@ testObliv = testProperty "Test Obliv" $ do -- the gen monad
 example :: Test
 example = testProperty "An easy example" $ (outputs, views) === deterministicEvaluation program inputs tapes
   where program :: Program Located
-        Right program = runParser programParser empty "hardcode example" "\
+        Right (Right program) = validate empty <$> runParser programParser () "hardcode example" "\
         \rand = FLIP @P1\n\
         \sec = SECRET @P2\n\
         \comp1 = !(sec + 1)\n\
@@ -159,8 +164,8 @@ example = testProperty "An easy example" $ (outputs, views) === deterministicEva
 
 pipeline :: Test
 pipeline = testProperty "3partyXOR.cho gives correct outputs" $ ioProperty do
-  program' <- parseFromFile (changeState (const ()) (const empty) programParser) "examples/3partyXOR.cho"
-  let program = either (error . show) id program'
+  program' <- parseFromFile programParser "examples/3partyXOR.cho"
+  let program = either error id $ either (error . show) id $ validate empty <$> program'
   return do  -- The Gen Monad!
     let (c, h1, h2) = (Party "C", Party "H1", Party "H2")
     secrets <- vectorOf 3 (arbitrary @Bool)
@@ -183,8 +188,8 @@ oneOfFourOT :: Test
 oneOfFourOT = testProperty "1-of-4 Oblivious Transfer" $ ioProperty oneOfFourOTIO
 oneOfFourOTIO :: IO (Gen Property)
 oneOfFourOTIO = do
-  program' <- parseFromFile (changeState (const ()) (const empty) programParser) "examples/1of4OT.cho"
-  let program = either (error . show) id program'
+  program' <- parseFromFile programParser "examples/1of4OT.cho"
+  let program = either error id $ either (error . show) id $ validate empty <$> program'
   return do  -- The Gen Monad!
     messages <- vectorOf 4 (arbitrary @Bool)
     selection <- chooseInt (0,3)
@@ -209,8 +214,8 @@ gmwAndGates :: Test
 gmwAndGates = testProperty "Two party three-arg AND in GMW" $ ioProperty gmwAndGatesIO
 gmwAndGatesIO :: IO (Gen Property)
 gmwAndGatesIO = do
-  program' <- parseFromFile (changeState (const ()) (const empty) programParser) "examples/3party2andGMW.cho"
-  let program = either (error . show) id program'
+  program' <- parseFromFile programParser "examples/3party2andGMW.cho"
+  let program = either error id $ either (error . show) id $ validate empty <$> program'
   return do  -- The Gen Monad!
     secrets <- vectorOf 3 (arbitrary @Bool)
     let inputs = Inputs $ fromList $ [Variable "c_in"

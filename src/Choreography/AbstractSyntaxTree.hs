@@ -1,6 +1,7 @@
 module Choreography.AbstractSyntaxTree
 where
 
+import Data.Map.Strict (Map)
 import Text.Parsec (SourcePos)
 
 import Choreography.Party (Party(..), PartySet)
@@ -92,6 +93,28 @@ instance (Pretty1 f, Functor f) => Pretty (Statement f) where
   pretty (Output fv) = unwords [outputKeyword, pretty fv]
 
 type Program f = [f (Statement f)]
+
+data Macro f = Macro {name :: String, body :: Program f}
+deriving instance (forall a. (Show a) => Show (f a)) => Show (Macro f)
+macroKeywords :: [String]
+macroKeywords = ["MACRO", "AS", "ENDMACRO"]
+
+data MacroCall f = MacroCall {macro :: String,
+                              variables :: Map Variable (f Variable),
+                              aliases :: Map Party (f Party),
+                              returns :: Map Variable (f Variable)}
+deriving instance (forall a. (Show a) => Show (f a)) => Show (MacroCall f)
+callKeywords :: [String]
+callKeywords = ["DO", "USING", "ANDUSING", "RETRIEVING"]
+callSymbols :: [String]
+callSymbols = ["[", "=", ",", "]"]
+
+data PreProgramLine f = PPStmnt (Statement f)
+                      | PPMacro (Macro f)
+                      | PPCall (MacroCall f)
+deriving instance (forall a. (Show a) => Show (f a)) => Show (PreProgramLine f)
+
+type PreProgram f = [f (PreProgramLine f)]
 
 
 gatherSelectionVars :: (Foldable f) => ObvBody f -> [Variable]

@@ -14,13 +14,13 @@ main :: IO ()
 main = do
   programFile : fixedInputs <- getArgs
   program' <- parseFromFile (changeState (const ()) (const mempty) programParser) programFile
-  let program = either (error . show) id program'
-  let (_, ProgramMetaData{inputVars, tapeVars}) = asPythonFunction top program
+  let program = either error id $ either (error . show) id $ validate mempty <$> program'
+  let (_, ProgramMetaData{inputVars, tapeVars}) = asPythonFunction program
   let secrets = (toEnum . read @Int <$> fixedInputs) <> repeat True
-  let inputs = Inputs $ fromList $ concat inputVars `zip` secrets
+  let inputs = Inputs $ fromList $ (snd <$> inputVars) `zip` secrets
   putStrLn $ "Inputs:  " ++ show (toList $ inputsMap inputs)
   randomness <- generate $ vectorOf (sum $ length <$> tapeVars) (arbitrary @Bool)
-  let tapes = Tapes $ fromList $ concat tapeVars `zip` randomness
+  let tapes = Tapes $ fromList $ (snd <$> tapeVars) `zip` randomness
   putStrLn $ "Tapes:  " ++ show (toList $ tapesMap tapes)
   (os, vs, code) <- runPythonProgram program inputs tapes
   writeFile ".temp.py" $ asString code
