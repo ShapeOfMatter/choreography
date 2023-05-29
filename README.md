@@ -50,6 +50,11 @@ The actual python code that gets used gets written to `.temp.py`, in case you wa
 ## Notes
 
 - The python snippets used in code-generation are read at compile-time using quasi-quotes and template haskell!
+- Inputs and outputs, tapes and views, are all handled as lookup tables by variable name.
+  This helps make sense of what you're seeing in theory, but it causes problems once you get into functions.
+  In the case of Views, we yield a list of values for each variable, in case it gets used more than once
+  (but there's no assistance figuring out which is which).
+  In the case of Output, _only the last value for each variable will be yielded_.
 
 ## Wishlist
 

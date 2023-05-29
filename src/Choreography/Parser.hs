@@ -1,55 +1,21 @@
 module Choreography.Parser
 where
 
-import Data.Foldable (traverse_)
 import Data.Functor.Identity (Identity(..))
 import Data.List (intercalate, nub)
-import Data.Map.Strict ((!), (!?), Map, insert)
-import Data.Set (fromList, singleton)
+import Data.Set (fromList)
 import Text.Parsec
 import Text.Parsec.Expr
 import Text.Parsec.Token
+import Text.Parsec.String (Parser)
 
-import Choreography.AbstractSyntaxTree
+import Choreography.AbstractSyntaxTree hiding (Located, Location)
 import Choreography.Party
-import Utils ((<$$>), Pretty, pretty)
+import Utils ((<$$>))
 
+type Sourced = (,) SourcePos
 
-asImproper :: Located a -> ILocated a
-asImproper (Location{lowners, source}, a) = (Improper{iowners=Just lowners, isource=source}, a)
-asProper :: (Pretty a) => ILocated a -> Parser (Located a)
-asProper (Improper{isource=source, iowners=Just os}, obj) = return (Location{source, lowners=os}, obj)
-asProper (Improper{isource=source, iowners=Nothing}, obj) = do setPosition source
-                                                               parserFail $ "Unable to locate " ++ pretty obj
-                                                                            ++ " among parties; nobody could do that computation."
-class ForceLocation alg where
-  locate :: alg ILocated -> Parser (alg Located)
-forceLocation :: (ForceLocation alg, Pretty (alg Located)) => ILocated (alg ILocated) -> Parser (Located (alg Located))
-forceLocation (improper, ialg) = do lalg <- locate ialg
-                                    asProper (improper, lalg)
-instance ForceLocation Algebra where
-  locate (Literal fb) = Literal <$> asProper fb
-  locate (Var fvar) = Var <$> asProper fvar
-  locate (Xor fa1 fa2) = do la1 <- forceLocation fa1
-                            la2 <- forceLocation fa2
-                            return $ Xor la1 la2
-  locate (And fa1 fa2) = do la1 <- forceLocation fa1
-                            la2 <- forceLocation fa2
-                            return $ And la1 la2
-  locate (Not falg) = Not <$> forceLocation falg
-instance ForceLocation ObvBody where
-  locate (ObvBody fc0 fc1 fv) = do lc0 <- forceLocation fc0
-                                   lc1 <- forceLocation fc1
-                                   lv <- asProper fv
-                                   return $ ObvBody lc0 lc1 lv
-instance ForceLocation ObvChoice where
-  locate (ObvLeaf var) = return $ ObvLeaf var
-  locate (ObvBranch body) = ObvBranch <$> locate body
-
-
-type Parser = ParsecT String (Map Variable PartySet) Identity
-
-positioned :: Parser a -> Parser (SourcePos, a)
+positioned :: Parser a -> Parser (Sourced a)
 positioned p = do source <- getPosition
                   (source,) <$> p
 
@@ -60,6 +26,8 @@ opNames = [bindKeyword, atKeyword, secretKeyword, flipKeyword, outputKeyword, ch
           <> xorNames
           <> andNames
           <> notNames
+          <> macroKeywords
+          <> callKeywords
 
 tokenizer :: TokenParser st
 tokenizer = makeTokenParser LanguageDef {
@@ -76,115 +44,122 @@ tokenizer = makeTokenParser LanguageDef {
   caseSensitive = True
 }
 
+listSeparator :: Parser ()
+listSeparator = whiteSpace tokenizer >> char ',' >> whiteSpace tokenizer
+
 -- Define parser for Party
-partyParser :: Parser (Located Party)
+partyParser :: Parser (Sourced Party)
 partyParser = do (source, _) <- positioned $ char '@'
                  party <- Party <$> identifier tokenizer
-                 return (Location{source, lowners = Parties $ singleton party}, party)
+                 return (source, party)
 
-partiesParser :: Parser (Located PartySet)
-partiesParser = do let comma = do {whiteSpace tokenizer; _ <- char ','; whiteSpace tokenizer}
-                   (source, lowners) <- positioned $ Parties . fromList . (Party <$>) <$> identifier tokenizer `sepBy1` comma
-                   return (Location{source, lowners}, lowners)
+partiesParser :: Parser (Sourced PartySet)
+partiesParser = do let makePartySet = Parties . fromList . (Party <$>)
+                   positioned $ makePartySet <$> identifier tokenizer `sepBy1` listSeparator
 
-boundVariable :: Parser (Located Variable)
-boundVariable = do source <- getPosition
-                   var <- Variable <$> identifier tokenizer
-                   mOwners <- (!? var) <$> getState
-                   maybe (parserFail $ "Unbound variable " ++ pretty var ++ ".")
-                         (\lowners -> return (Location {lowners, source}, var))
-                         mOwners
+variableParser :: Parser (Sourced Variable)
+variableParser = positioned $ Variable <$> identifier tokenizer
+
+funcNameParser :: Parser (Sourced FuncName)
+funcNameParser = positioned $ FuncName <$> identifier tokenizer
+
+pargsParser :: Parser [(Sourced Party, [Sourced Variable])]
+pargsParser = parens tokenizer $ pasParser `sepBy` listSeparator
+  where pasParser = do fp <- positioned $ Party <$> identifier tokenizer
+                       args <- parens tokenizer $ variableParser `sepBy` listSeparator
+                       return (fp, args)
 
 -- Define parser for Algebra
-algebraParser :: Parser (ILocated (Algebra ILocated))
+algebraParser :: Parser (Sourced (Algebra Sourced))
 algebraParser = buildExpressionParser ops terms <?> "Algebra"
   where terms = parens tokenizer algebraParser <|> litParser <|> varParser
-        chooseOf cls subcls = choice [positioned . try $ cls tokenizer sc | sc <- subcls] <?> ("one of " ++ intercalate ", " subcls)
-        litParser = do (isource, b) <- (const (Bit True) <$$> chooseOf reserved trueNames)
+        litParser = do (source, b) <- (const (Bit True) <$$> chooseOf reserved trueNames)
                                        <|> (const (Bit False) <$$> chooseOf reserved falseNames)
-                       let loc = Improper{isource, iowners=Just top}
-                       return (loc, Literal (loc, b))
-        varParser = do (loc, var) <- asImproper <$> boundVariable
+                       return (source, Literal (source, b))
+        varParser = do (loc, var) <- variableParser
                        return (loc, Var (loc, var))
-        biOpParser :: (ILocated (Algebra ILocated) -> ILocated (Algebra ILocated) -> Algebra ILocated)
-                      -> SourcePos
-                      -> ILocated (Algebra ILocated) -> ILocated (Algebra ILocated)
-                      -> ILocated (Algebra ILocated)
-        biOpParser constructor isource alg1@(Improper{iowners=o1}, _) alg2@(Improper{iowners=o2}, _) =
-          (Improper{ isource,
-                     iowners = o1 >>= (o2 >>=) . intersect },
-           constructor alg1 alg2)
-        ops :: OperatorTable String (Map Variable PartySet) Identity (ILocated (Algebra ILocated))
+        ops :: OperatorTable String () Identity (Sourced (Algebra Sourced))
         ops = [ [Prefix $ do (isource, _) <- chooseOf reservedOp notNames
-                             return \alg@(loc, _) -> (loc{isource}, Not alg)]
+                             return \alg -> (isource, Not alg)]
                ,[Infix (do (isource, _) <- chooseOf reservedOp xorNames
                            return $ biOpParser Xor isource) AssocLeft]
                ,[Infix (do (isource, _) <- chooseOf reservedOp andNames
                            return $ biOpParser And isource) AssocLeft] ]
+        biOpParser :: (Sourced (Algebra Sourced) -> Sourced (Algebra Sourced) -> Algebra Sourced)
+                      -> SourcePos
+                      -> Sourced (Algebra Sourced) -> Sourced (Algebra Sourced)
+                      -> Sourced (Algebra Sourced)
+        biOpParser constructor source alg1 alg2 = (source, constructor alg1 alg2)
+        chooseOf cls subcls = choice [positioned . try $ cls tokenizer sc | sc <- subcls] <?> ("one of " ++ intercalate ", " subcls)
 
 -- Define parser for Oblivious terms
-obvTransferParser :: Parser (ILocated (ObvBody ILocated))
-obvTransferParser = do let branchParser = (asImproper <$> (ObvLeaf <$$> boundVariable))
+obvTransferParser :: Parser (Sourced (ObvBody Sourced))
+obvTransferParser = do let branchParser = (ObvLeaf <$$> variableParser)
                                           <|> (ObvBranch <$$> obvTransferParser)
-                       (isource, [choice0@(o0, _), choice1@(o1, _)]) <- positioned
-                                                                        $ brackets tokenizer
-                                                                        $ branchParser `sepBy` (char ',' >> whiteSpace tokenizer)
+                       (source, [choice0, choice1]) <- positioned
+                                                        $ brackets tokenizer
+                                                        $ branchParser `sepBy` listSeparator
                        reservedOp tokenizer choiceKeyword
-                       selectionVar <- boundVariable
-                       return (Improper{isource, iowners = iowners o0 >>= (iowners o1 >>=) . intersect},
-                               ObvBody choice0 choice1 $ asImproper selectionVar)
+                       selectionVar <- variableParser
+                       return (source, ObvBody choice0 choice1 selectionVar)
 
 -- Define parser for Expression
-expressionParser :: Parser (Located (Statement Located))
-expressionParser =  sendParser <|> outputParser <|> bindingParser
+expressionParser :: Parser (Sourced (Statement Sourced))
+expressionParser =  sendParser <|> outputParser <|> declarationParser <|> callParser <|> bindingParser
   where
-    bindingParser :: Parser (Located (Statement Located))
+    bindingParser :: Parser (Sourced (Statement Sourced))
     bindingParser = do (source, boundVar) <- positioned $ Variable <$> identifier tokenizer
                        _ <- reservedOp tokenizer bindKeyword
-                       (lowners, stmt :: Statement Located) <- choice [
+                       (stmt :: Statement Sourced) <- choice [
                           -- Secret Parser:
                           do reservedOp tokenizer secretKeyword
-                             owner@(Location{lowners=os}, _) <- partyParser
-                             return (os, Secret (Location{lowners=os, source}, boundVar) owner),
+                             Secret (source, boundVar) <$> partyParser,
                           -- Flip Parser:
                           do reservedOp tokenizer flipKeyword
-                             owner@(Location{lowners=os}, _) <- partyParser
-                             return (os, Flip (Location{lowners=os, source}, boundVar) owner),
+                             Flip (source, boundVar) <$> partyParser,
                           -- Oblivious Transfer Parser:
                           do reservedOp tokenizer (head oblivKeywords)
-                             lbody@(_, body) <- obvTransferParser >>= forceLocation
+                             lbody <- obvTransferParser
                              reservedOp tokenizer (oblivKeywords !! 1)
-                             lpTo@(_, pTo) <- partiesParser
-                             traverse_ (\var ->
-                                 do possiblePTo <- (! var) <$> getState
-                                    if pTo `isSubsetOf` possiblePTo
-                                    then return ()
-                                    else parserFail $ "Parties " ++ pretty pTo ++ " cannot choose choose obliviously by "
-                                                       ++ pretty var ++ "; they don't all own it."
-                               ) $ gatherSelectionVars body
-                             return (pTo, Oblivious (Location{lowners=pTo, source}, boundVar) lpTo lbody),
+                             lpTo <- partiesParser
+                             return (Oblivious (source, boundVar) lpTo lbody),
                           -- Compute Parser:
-                          do alg@(Location{lowners=os}, _) <- algebraParser >>= forceLocation
-                             return (os, Compute (Location{lowners=os, source}, boundVar) alg)
+                          do Compute (source, boundVar) <$> algebraParser
                         ]
-                       modifyState $ insert boundVar lowners
-                       return (Location{source, lowners}, stmt)
+                       return (source, stmt)
     sendParser = do (source, _) <- positioned $ reservedOp tokenizer (head sendKeywords)
-                    var@(Location{lowners=pFrom}, v) <- boundVariable
+                    var <- variableParser
                     reservedOp tokenizer (sendKeywords !! 1)
-                    lpTo@(_, pTo) <- partiesParser
-                    let lowners = pFrom `union` pTo
-                    modifyState $ insert v lowners
-                    return (Location {source, lowners}, Send lpTo var)
+                    lpTo <- partiesParser
+                    return (source, Send lpTo var)
     outputParser = do (source, _) <- positioned $ reservedOp tokenizer outputKeyword
-                      var@(loc, _) <- boundVariable
-                      return (loc{source}, Output var)
+                      var <- variableParser
+                      return (source, Output var)
+    declarationParser = do (source, _) <- positioned $ reservedOp tokenizer $ head macroKeywords
+                           ffName <- funcNameParser
+                           pargs <- pargsParser
+                           reservedOp tokenizer (macroKeywords !! 1)
+                           body <- manyTill (whiteSpace tokenizer >> expressionParser)  -- I wish i could just recurse :( ?
+                                            (whiteSpace tokenizer >> reservedOp tokenizer (macroKeywords !! 2))
+                           return (source, Declaration ffName pargs body)
+    callParser = do (source, _) <- positioned $ reservedOp tokenizer $ head callKeywords
+                    ffname <- funcNameParser
+                    pargs <- pargsParser
+                    reservedOp tokenizer (callKeywords !! 1)
+                    bindings <- parens tokenizer $ (do
+                        v1 <- variableParser
+                        reservedOp tokenizer bindKeyword
+                        v2 <- variableParser
+                        return (v1, v2)
+                      ) `sepBy` listSeparator
+                    return (source, Call ffname pargs bindings)
+
 
 -- Define parser for Program
-programParser :: Parser (Program Located)
+programParser :: Parser (Program Sourced)
 programParser = do whiteSpace tokenizer
-                   lns <-  many (do e <- expressionParser
-                                    _ <- whiteSpace tokenizer
-                                    return e)
+                   lns :: Program Sourced <- many (do e <- expressionParser
+                                                      _ <- whiteSpace tokenizer
+                                                      return e)
                    eof
                    return lns

@@ -5,10 +5,14 @@ import Text.Parsec (SourcePos)
 
 import Choreography.Party (Party(..), PartySet)
 import Utils (Pretty, pretty, Pretty1)
+import Data.List (intercalate)
 
 
 newtype Variable = Variable {variable :: String} deriving (Eq, Ord, Show)
 instance Pretty Variable where pretty = variable
+
+newtype FuncName = FuncName {funcName :: String} deriving (Eq, Ord, Show)
+instance Pretty FuncName where pretty = funcName
 
 newtype Bit = Bit { bit :: Bool } deriving (Bounded, Enum, Eq, Ord, Show)
 trueNames :: [String]
@@ -60,6 +64,8 @@ data Statement f = Compute (f Variable) (f (Algebra f))
                  | Send (f PartySet) (f Variable)
                  | Oblivious (f Variable) (f PartySet) (f (ObvBody f))
                  | Output (f Variable)
+                 | Declaration (f FuncName) [(f Party, [f Variable])] (Program f)
+                 | Call (f FuncName) [(f Party, [f Variable])] [(f Variable, f Variable)]
 deriving instance (forall a. (Show a) => Show (f a)) => Show (Statement f)
 bindKeyword :: String
 bindKeyword = "="
@@ -75,6 +81,10 @@ oblivKeywords :: [String]
 oblivKeywords = ["OBLIVIOUSLY", "FOR"]
 outputKeyword :: String
 outputKeyword = "OUTPUT"
+macroKeywords :: [String]
+macroKeywords = ["MACRO", "AS", "ENDMACRO"]
+callKeywords :: [String]
+callKeywords = ["DO", "GET"]
 instance (Pretty1 f, Functor f) => Pretty (Statement f) where
   pretty (Compute fv fa) = unwords [pretty fv, bindKeyword, pretty fa]
   pretty (Secret fv fp) = unwords [pretty fv, bindKeyword, secretKeyword, atKeyword, pretty fp]
@@ -90,8 +100,22 @@ instance (Pretty1 f, Functor f) => Pretty (Statement f) where
                                       oblivKeywords !! 1,
                                       pretty fps]
   pretty (Output fv) = unwords [outputKeyword, pretty fv]
+  pretty (Declaration ffName pargs prog) = unlines [ unwords [head macroKeywords,
+                                                              pretty ffName <> prettyArgsList pargs,
+                                                              macroKeywords !! 1]
+                                                   , unlines $ ("  " <>) <$> lines (pretty prog)
+                                                   , macroKeywords !! 2 ]
+  pretty (Call ffName inArgs outArgs) = unwords [head callKeywords, call, callKeywords !! 1, bindings]
+                                          where call = pretty ffName <> prettyArgsList inArgs
+                                                bindings = "(" <> intercalate ", " ((\(a,b) -> pretty a <> "=" <> pretty b) <$> outArgs) <> ")"
+
+prettyArgsList :: (Pretty1 f, Functor f) => [(f Party, [f Variable])] -> String
+prettyArgsList pargs = pAL (prettyPair <$> pargs)
+  where pAL xs = "(" <> intercalate ", " xs <> ")"
+        prettyPair (fp, fvs) = pretty fp <> pAL (pretty <$> fvs)
 
 type Program f = [f (Statement f)]
+
 
 
 gatherSelectionVars :: (Foldable f) => ObvBody f -> [Variable]
