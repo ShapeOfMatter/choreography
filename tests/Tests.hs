@@ -2,7 +2,7 @@ module Tests where
 
 import Data.Functor.Identity (Identity(..))
 import Data.List (nub)
-import Data.Map.Strict (fromList, singleton, empty)
+import Data.Map.Strict ((!), fromList, singleton, empty, member)
 import qualified Data.Set as Set
 import Distribution.TestSuite.QuickCheck
 import Test.QuickCheck ((===), Arbitrary (arbitrary), chooseInt, counterexample, Gen, ioProperty, Property, vectorOf)
@@ -32,7 +32,8 @@ tests = do return [ tautology
                   , example
                   , pipeline
                   , oneOfFourOT
-                  , gmwAndGates]
+                  , gmwAndGates
+                  , miniFunc]
 
 
 tautology :: Test
@@ -233,4 +234,23 @@ gmwAndGatesIO = do
     let (vc, (observed, _)) = deterministicEvaluation' program inputs tapes
     return $ counterexample (pretty vc) $ observed == outputs
 
-
+miniFunc :: Test
+miniFunc = testProperty "Mini functions example" $ ioProperty gmwAndGatesIO
+miniFuncIO :: IO (Gen Property)
+miniFuncIO = do
+  program' <- parseFromFile programParser "examples/miniFunc.cho"
+  let program = either error id $ either (error . show) id $ validate empty <$> program'
+  return do  -- The Gen Monad!
+    secrets <- vectorOf 2 (arbitrary @Bool)
+    let inputs = Inputs $ fromList $ [Variable "c_in"
+                                     ,Variable "h_in"] `zip` secrets
+    let tapes = mempty
+    let (nCIn, nHIn) = (not $ inputsMap inputs ! Variable "c_in", not $ inputsMap inputs ! Variable "h_in")
+    let y = [(Variable "c_out", nCIn)
+            ,(Variable "h_out1", nHIn)
+            ,(Variable "h_out2", nHIn)]
+    let outputs = Outputs $ fromList [(Identity p1, fromList y), (Identity p2, fromList y)]
+    let views = Views $ fromList [(Identity $ Party "C", fromList [(Variable "na", [nHIn, nHIn])]),
+                                  (Identity $ Party "H", fromList [(Variable "na", [nCIn])])]
+    let (vc, (observedO, observedV)) = deterministicEvaluation' program inputs tapes
+    return $ counterexample (pretty vc) $ observedO == outputs && observedV == views
