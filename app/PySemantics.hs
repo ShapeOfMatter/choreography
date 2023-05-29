@@ -1,4 +1,4 @@
-module Main where
+module PySemantics where
 
 import Data.Map.Strict (fromList, toList)
 import Text.Parsec.String (parseFromFile)

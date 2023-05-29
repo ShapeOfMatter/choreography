@@ -2,22 +2,29 @@ module Choreography.Validate
 where
 
 import Control.Arrow (ArrowChoice(left))
-import Data.Map.Strict ((!?), insertWith, Map)
+import Control.Monad (when)
+import Data.Functor.Identity (Identity(..))
+import Data.Map.Strict ((!?), insertWith, Map, insert, fromList)
 import Polysemy (Members, run, Sem)
 import Polysemy.Error (Error, runError, throw)
-import Polysemy.State (evalState, gets, modify, State)
+import Polysemy.State (get, gets, put, runState, State)
 
 import Choreography.AbstractSyntaxTree
 import Choreography.Parser (Sourced)
-import Choreography.Party
-import Utils ((<$$>), Pretty, pretty)
+import Choreography.Party hiding (insert)
+import Utils (pretty)
 
 
 validate :: Map Variable PartySet -> Program Sourced -> Either String (Program Located)
-validate context = left pretty . run . runError . evalState context . traverse validateStatement
+validate context = left pretty . (snd <$>) . validate' context
+
+validate' :: Map Variable PartySet -> Program Sourced -> Either (Sourced String) (Map Variable PartySet, Program Located)
+validate' context = cullState . run . runError . runState mempty{variables=context} . traverse validateStatement
+  where cullState (Left l) = Left l
+        cullState (Right (ValidationState{variables}, p)) = Right (variables, p)
 
 validateStatement :: forall r.
-                     (Members '[Error (Sourced String), State (Map Variable PartySet)] r) =>
+                     (Members '[Error (Sourced String), State ValidationState] r) =>
                      Sourced (Statement Sourced) -> Sem r (Located (Statement Located ))
 validateStatement (sourcePos, stmnt) = case stmnt of
   Compute fvar@(_, v) falg -> do (ps, alg) <- validateAlg falg
@@ -37,29 +44,74 @@ validateStatement (sourcePos, stmnt) = case stmnt of
                                                locateLine (ps1 `union` ps2) $ Oblivious (locate ps2 fvar) (locate ps2 fps) body
   Output fvar -> do ps <- lookupVar fvar
                     locateLine ps $ Output (locate ps fvar)
+  Declaration ffName pargs body -> do let lfName@(_, fn) = locate top ffName
+                                      let locateParg (fp@(_, p), vs) = (locate (singleton p) fp, locate (singleton p) <$> vs)
+                                      let pargs' = locateParg <$> pargs
+                                      let asKVP ((_, p), vs) = [(v, singleton p) | (_, v) <- vs]
+                                      (vars, body') <- either throw return $ validate' (fromList $ concat $ asKVP <$> pargs') body
+                                      st@ValidationState{funcArgs, funcReturns} <- get
+                                      put st{funcArgs = insert fn [(p, length vs) | ((_, p), vs) <- pargs'] funcArgs,
+                                             funcReturns = insert fn vars funcReturns}
+                                      locateLine top $ Declaration lfName pargs' body'
+  Call ffName pargs returns -> do let lfName@(_, fn) = locate top ffName
+                                  (requiredArgs, possibleReturns) <- lookupFunc ffName
+                                  let locateArg p fv@(src, var) = do ps <- lookupVar fv
+                                                                     if p `isElementOf` ps
+                                                                       then return $ locate (singleton p) fv
+                                                                       else throw (src, pretty p ++ " can't use " ++ pretty var ++ ".")
+                                  let locateParg (fp@(_, p), vs) = do vs' <- traverse (locateArg p) vs
+                                                                      return (locate (singleton p) fp, vs')
+                                  pargs' <- traverse locateParg pargs
+                                  when ( (length . snd <$> pargs') /= (snd <$> requiredArgs) )
+                                    $ throw (sourcePos, pretty fn ++ " has signature " ++ show requiredArgs ++ "; argument miss-match.")
+                                  let aliases = fromList $ [(pfunc, Identity preal) | ((pfunc, _), ((_, preal), _)) <- zip requiredArgs pargs']
+                                  let validateReturn (nb@(_, newBinding), ff@(srcff, fromFunc)) =
+                                        do fowners <- maybe (throw (srcff, pretty fn ++ " doesn't afford variable " ++ pretty fromFunc ++ "."))
+                                                            return
+                                                            $ possibleReturns !? fromFunc
+                                           let nowners = runIdentity $ dealiass aliases fowners
+                                           bindToParties newBinding nowners
+                                           return (locate nowners nb, locate fowners ff)
+                                  returns' <- traverse validateReturn returns
+                                  locateLine top $ Call lfName pargs' returns'
   where locateLine :: PartySet -> Statement Located -> Sem r (Located (Statement Located))
         locateLine ps st = return $ locate ps (sourcePos, st)
 
 locate :: PartySet -> Sourced a -> Located a
 locate ps (source, a) = (Location{source, lowners=ps}, a)
 
-bindToParties :: forall k v r.
-                 (Members '[State (Map k v)] r,
-                  Ord k,
-                  Semigroup v) =>
-                 k -> v -> Sem r ()
-bindToParties = modify <$$> insertWith (<>)
+data ValidationState = ValidationState{ variables :: Map Variable PartySet
+                                      , funcArgs :: Map FuncName [(Party, Int)]
+                                      , funcReturns :: Map FuncName (Map Variable PartySet) }
+                       deriving (Show)
+instance Semigroup ValidationState where
+  ValidationState v1 a1 r1 <> ValidationState v2 a2 r2 = ValidationState (v1 <> v2) (a1 <> a2) (r1 <> r2)
+instance Monoid ValidationState where
+  mempty = ValidationState mempty mempty mempty
 
-lookupVar :: forall k v r.
-             (Members '[State (Map k v), Error (Sourced String)] r,
-              Ord k,
-              Pretty k) =>
-             Sourced k -> Sem r v
-lookupVar (source, var) = do mps <- gets (!? var)
+bindToParties :: forall r.
+                 (Members '[State ValidationState] r) =>
+                 Variable -> PartySet -> Sem r ()
+bindToParties v ps = do vst@ValidationState{variables=vars} <- get
+                        put vst{variables = insertWith (<>) v ps vars}
+
+lookupVar :: forall r.
+             (Members '[State ValidationState, Error (Sourced String)] r) =>
+             Sourced Variable -> Sem r PartySet
+lookupVar (source, var) = do mps <- gets $ (!? var) . variables
                              maybe (throw (source, "Variable " ++ pretty var ++ " is not in scope.")) return mps
 
+lookupFunc :: forall r.
+              (Members '[State ValidationState, Error (Sourced String)] r) =>
+              Sourced FuncName -> Sem r ([(Party, Int)], Map Variable PartySet)
+lookupFunc (source, fName) = do requiredArgs' <- gets $ (!? fName) . funcArgs
+                                requiredArgs <- maybe (throw (source, "Function " ++ pretty fName ++ " is not in scope.")) return requiredArgs'
+                                possibleReturns' <- gets $ (!? fName) . funcReturns
+                                possibleReturns <- maybe (throw (source, "This should be impossible.")) return possibleReturns'
+                                return (requiredArgs, possibleReturns)
+
 validateObliv :: forall r.
-                 (Members '[Error (Sourced String), State (Map Variable PartySet)] r) =>
+                 (Members '[Error (Sourced String), State ValidationState] r) =>
                  PartySet -> Sourced (ObvBody Sourced) -> Sem r (PartySet, Located (ObvBody Located))
 validateObliv ps2 (source, ObvBody fBranch tBranch choice)
   = do psc <- lookupVar choice
@@ -78,7 +130,7 @@ validateObliv ps2 (source, ObvBody fBranch tBranch choice)
                                                   return (ps, (location{source=src}, ObvBranch body'))
 
 validateAlg :: forall r.
-               (Members '[Error (Sourced String), State (Map Variable PartySet)] r) =>
+               (Members '[Error (Sourced String), State ValidationState] r) =>
                Sourced (Algebra Sourced) -> Sem r (PartySet, Located (Algebra Located))
 validateAlg (src, algebra) = case algebra of
   Literal fbit -> return (top, locate top (src, Literal $ locate top fbit))

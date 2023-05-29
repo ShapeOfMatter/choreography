@@ -3,7 +3,6 @@ where
 
 import Data.Functor.Identity (Identity(..))
 import Data.List (intercalate, nub)
-import qualified Data.Map.Strict as Map
 import Data.Set (fromList)
 import Text.Parsec
 import Text.Parsec.Expr
@@ -45,6 +44,9 @@ tokenizer = makeTokenParser LanguageDef {
   caseSensitive = True
 }
 
+listSeparator :: Parser ()
+listSeparator = whiteSpace tokenizer >> char ',' >> whiteSpace tokenizer
+
 -- Define parser for Party
 partyParser :: Parser (Sourced Party)
 partyParser = do (source, _) <- positioned $ char '@'
@@ -52,12 +54,20 @@ partyParser = do (source, _) <- positioned $ char '@'
                  return (source, party)
 
 partiesParser :: Parser (Sourced PartySet)
-partiesParser = do let comma = do {whiteSpace tokenizer; _ <- char ','; whiteSpace tokenizer}
-                   let makePartySet = Parties . fromList . (Party <$>)
-                   positioned $ makePartySet <$> identifier tokenizer `sepBy1` comma
+partiesParser = do let makePartySet = Parties . fromList . (Party <$>)
+                   positioned $ makePartySet <$> identifier tokenizer `sepBy1` listSeparator
 
 variableParser :: Parser (Sourced Variable)
 variableParser = positioned $ Variable <$> identifier tokenizer
+
+funcNameParser :: Parser (Sourced FuncName)
+funcNameParser = positioned $ FuncName <$> identifier tokenizer
+
+pargsParser :: Parser [(Sourced Party, [Sourced Variable])]
+pargsParser = parens tokenizer $ pasParser `sepBy` listSeparator
+  where pasParser = do fp <- positioned $ Party <$> identifier tokenizer
+                       args <- parens tokenizer $ variableParser `sepBy` listSeparator
+                       return (fp, args)
 
 -- Define parser for Algebra
 algebraParser :: Parser (Sourced (Algebra Sourced))
@@ -88,14 +98,14 @@ obvTransferParser = do let branchParser = (ObvLeaf <$$> variableParser)
                                           <|> (ObvBranch <$$> obvTransferParser)
                        (source, [choice0, choice1]) <- positioned
                                                         $ brackets tokenizer
-                                                        $ branchParser `sepBy` (char ',' >> whiteSpace tokenizer)
+                                                        $ branchParser `sepBy` listSeparator
                        reservedOp tokenizer choiceKeyword
                        selectionVar <- variableParser
                        return (source, ObvBody choice0 choice1 selectionVar)
 
 -- Define parser for Expression
 expressionParser :: Parser (Sourced (Statement Sourced))
-expressionParser =  sendParser <|> outputParser <|> bindingParser
+expressionParser =  sendParser <|> outputParser <|> declarationParser <|> callParser <|> bindingParser
   where
     bindingParser :: Parser (Sourced (Statement Sourced))
     bindingParser = do (source, boundVar) <- positioned $ Variable <$> identifier tokenizer
@@ -125,47 +135,31 @@ expressionParser =  sendParser <|> outputParser <|> bindingParser
     outputParser = do (source, _) <- positioned $ reservedOp tokenizer outputKeyword
                       var <- variableParser
                       return (source, Output var)
+    declarationParser = do (source, _) <- positioned $ reservedOp tokenizer $ head macroKeywords
+                           ffName <- funcNameParser
+                           pargs <- pargsParser
+                           reservedOp tokenizer (macroKeywords !! 1)
+                           body <- manyTill (whiteSpace tokenizer >> expressionParser)  -- I wish i could just recurse :( ?
+                                            (whiteSpace tokenizer >> reservedOp tokenizer (macroKeywords !! 2))
+                           return (source, Declaration ffName pargs body)
+    callParser = do (source, _) <- positioned $ reservedOp tokenizer $ head callKeywords
+                    ffname <- funcNameParser
+                    pargs <- pargsParser
+                    reservedOp tokenizer (callKeywords !! 1)
+                    bindings <- parens tokenizer $ (do
+                        v1 <- variableParser
+                        reservedOp tokenizer bindKeyword
+                        v2 <- variableParser
+                        return (v1, v2)
+                      ) `sepBy` listSeparator
+                    return (source, Call ffname pargs bindings)
 
-callParser :: Parser (Sourced (MacroCall Sourced))
--- callKeywords = ["DO", "USING", "ANDUSING", "RETRIEVING"]
--- callSymbols = ["[", "=", ",", "]"]
-callParser = do (source, _) <- positioned $ reservedOp tokenizer (head callKeywords)
-                macro <- identifier tokenizer
-                reservedOp tokenizer (callKeywords !! 1)
-                variables <- parseMap variableParser
-                reservedOp tokenizer (callKeywords !! 2)
-                aliases <- parseMap partyParser
-                reservedOp tokenizer (callKeywords !! 3)
-                returns <- parseMap variableParser
-                return (source, MacroCall {macro, variables, aliases, returns})
-  where parseMap :: (Ord a) => Parser (Sourced a) -> Parser (Map.Map a (Sourced a))
-        parseMap p = brackets tokenizer $ Map.fromList <$> parseKVP p `sepBy` (char ',' >> whiteSpace tokenizer)
-        parseKVP p = do (_, key) <- p
-                        whiteSpace tokenizer
-                        _ <- char '='
-                        whiteSpace tokenizer
-                        val <- p
-                        return (key, val)
-
-macroParser :: Parser (Sourced (Macro Sourced))
--- macroKeywords = ["MACRO", "AS", "ENDMACRO"]
-macroParser = do (source, _) <- positioned $ reservedOp tokenizer $ head macroKeywords
-                 name <- identifier tokenizer
-                 reservedOp tokenizer $ macroKeywords !! 1
-                 body :: Program Sourced <- many (do e <- expressionParser
-                                                     whiteSpace tokenizer
-                                                     return e)
-                 reservedOp tokenizer $ macroKeywords !! 2
-                 return (source, Macro{name, body})
-
-lineParser :: Parser (Sourced (PreProgramLine Sourced))
-lineParser = try (PPMacro <$$> macroParser) <|> try (PPCall <$$> callParser) <|> (PPStmnt <$$> expressionParser)
 
 -- Define parser for Program
-programParser :: Parser (PreProgram Sourced)
+programParser :: Parser (Program Sourced)
 programParser = do whiteSpace tokenizer
-                   lns :: PreProgram Sourced <- many (do e <- lineParser
-                                                         _ <- whiteSpace tokenizer
-                                                         return e)
+                   lns :: Program Sourced <- many (do e <- expressionParser
+                                                      _ <- whiteSpace tokenizer
+                                                      return e)
                    eof
                    return lns

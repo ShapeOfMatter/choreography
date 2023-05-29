@@ -4,6 +4,7 @@ module Choreography (
   module Choreography.Parser,
   module Choreography.Party,
   module Choreography.Python,
+  module Choreography.Metadata,
   module Choreography.Semantics,
   module Choreography.Validate
 )
@@ -11,6 +12,7 @@ where
 
 import Choreography.AbstractSyntaxTree
 --import Choreography.EasySyntaxTree
+import Choreography.Metadata
 import Choreography.Parser
 import Choreography.Party
 import Choreography.Python

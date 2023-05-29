@@ -5,6 +5,7 @@ import Control.Exception (evaluate, Exception, try)
 import Data.Either (fromRight)
 import Data.Functor.Identity (Identity (runIdentity))
 import Data.Map.Strict (adjust, Map)
+import Data.Maybe (fromMaybe)
 import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Quote as THQuote
 import Polysemy (Sem)
@@ -14,9 +15,6 @@ import Text.Parsec hiding (try)
 
 class Pretty a where
   pretty :: a -> String
-instance Pretty a => Pretty (Maybe a) where
-  pretty (Just a) = pretty a
-  pretty Nothing = "⎵"
 instance {-# OVERLAPPING  #-} Pretty String where
   pretty = id
 instance Pretty Bool where
@@ -39,6 +37,8 @@ instance Pretty1 ((,) meta) where
   prettyf = snd
 instance Pretty1 [] where
   prettyf = unlines
+instance Pretty1 Maybe where
+  prettyf = fromMaybe "⎵"
 instance {-# OVERLAPPABLE #-} (Pretty1 f, Functor f, Pretty a) => Pretty (f a) where
   pretty = prettyf . (pretty <$>)
 

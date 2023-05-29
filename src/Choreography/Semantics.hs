@@ -1,31 +1,44 @@
 module Choreography.Semantics
 where
 
+import Control.Monad (unless, when)
 import Data.Bool (bool)
+import Data.Bifunctor (first)
 import Data.Foldable (traverse_)
-import Data.Map.Strict ((!?), empty, insert, Map, singleton, unionWith, toList)
+import Data.Functor.Identity (Identity(..))
+import Data.Map.Strict ((!?), empty, insert, Map, singleton, unionWith, toList, fromList)
 import Data.Maybe (fromMaybe, fromJust)
 import Polysemy (Members, run, Sem)
 import Polysemy.Reader (asks, Reader, runReader)
-import Polysemy.State (gets, modify, runState, State)
+import Polysemy.State (get, gets, modify, put, runState, State)
 import Polysemy.Writer (runWriter, tell, Writer)
 
-import Choreography.Party (intersect, Party(..), PartySet(..))
+import Choreography.Party (Concrete, dealias, intersect, isElementOf, Party(..), PartySet(..))
+import qualified Choreography.Party as Pty
 import Choreography.AbstractSyntaxTree
-import Utils ((<$$>), Pretty, pretty)
+import Utils ((<$$>), (<$$$>), Pretty, pretty, Pretty1)
 
 class NS ns a | ns -> a where
   find :: ns -> Variable -> Maybe a
   bind :: Variable -> a -> ns -> ns
 
-newtype VarContext = VarContext { varContextMap :: Map Variable (PartySet, Bool) } deriving (Eq, Monoid, Semigroup, Show)
-instance NS VarContext (PartySet, Bool) where
-  find = (!?) . varContextMap
-  bind v a = VarContext . insert v a . varContextMap
-instance Pretty VarContext where
-  pretty (VarContext vcm) = unlines $ (\(var, (ps, b))
-      -> "  " ++ pretty var ++ ": " ++ pretty b ++ " @ " ++ pretty ps
-    )  <$> toList vcm
+data EvalState f = EvalState { varContext :: Map Variable (PartySet, Bool)
+                             , funcContext :: Map FuncName ([(Party, [Variable])], Program f)
+                             , aliases :: Map Party (Concrete Party)
+                             }
+deriving instance (forall a. (Show a) => Show (f a)) => Show (EvalState f)
+instance forall f. Semigroup (EvalState f) where
+  EvalState vc1 fc1 a1 <> EvalState vc2 fc2 a2 = EvalState (vc1 <> vc2) (fc1 <> fc2) (a1 <> a2)
+instance forall f. Monoid (EvalState f) where
+  mempty = EvalState mempty mempty mempty
+instance forall f. NS  (EvalState f) (PartySet, Bool) where
+  find = (!?) . varContext
+  bind v a es@EvalState{varContext} = es{ varContext = insert v a varContext }
+instance forall f. (Pretty1 f) => Pretty (EvalState f) where
+  pretty EvalState{varContext, funcContext, aliases} = unlines
+    $ ( (\(var, (ps, b)) -> "  " ++ pretty var ++ ": " ++ pretty b ++ " @ " ++ pretty ps)  <$> toList varContext )
+    <> ( (\(fName, (args, _)) -> "  " ++ pretty fName ++ prettyArgsList (Identity <$$$> (first Identity <$> args))) <$> toList funcContext )
+    <> ( (\(plocal, preal) -> "  " ++ pretty plocal ++ " -> " ++ pretty preal) <$> toList aliases )
 
 newtype Inputs = Inputs { inputsMap :: Map Variable Bool } deriving (Eq, Monoid, Semigroup, Show)
 instance NS Inputs Bool where
@@ -37,24 +50,24 @@ instance NS Tapes Bool where
   find = (!?) . tapesMap
   bind v a = Tapes . insert v a . tapesMap
 
-newtype Outputs = Outputs { outputsMap :: Map Party (Map Variable Bool) } deriving (Eq, Show)
+newtype Outputs = Outputs { outputsMap :: Map (Concrete Party) (Map Variable Bool) } deriving (Eq, Show)
 instance Semigroup Outputs where
   Outputs om1 <> Outputs om2 = Outputs $ unionWith (<>) om1 om2
 instance Monoid Outputs where mempty = Outputs empty
 
-newtype Views = Views { viewsMap :: Map Party (Map Variable Bool) } deriving (Eq, Show)
+newtype Views = Views { viewsMap :: Map (Concrete Party) (Map Variable [Bool]) } deriving (Eq, Show)
 instance Semigroup Views where
-  Views om1 <> Views om2 = Views $ unionWith (<>) om1 om2
+  Views om1 <> Views om2 = Views $ unionWith (unionWith (<>)) om1 om2
 instance Monoid Views where mempty = Views empty
 
 
 -- Unsafe Lookup
 uslkup :: forall ns f a.
-          (NS ns a
-          ,Proper f) =>
+          (NS ns a,
+           Functor f, Proper f, Pretty1 f) =>
           f Variable -> ns -> a
 fv `uslkup` ns = fromMaybe
-  (error $ "Free variable " ++ variable (value fv) ++ " appeared during evaluation.")
+  (error $ "Free variable " ++ pretty fv ++ " appeared during evaluation.")
   (ns `find` value fv)
 
 
@@ -64,9 +77,9 @@ semantics :: forall f r.
                Reader Tapes,
                Writer Outputs,
                Writer Views,
-               State VarContext
+               State (EvalState f)
                ] r,
-              Proper f, Functor f, Traversable f) =>
+              Proper f, Functor f, Traversable f, Pretty1 f) =>
              Program f -> Sem r ()
 semantics = traverse_ stmtSemantics
 
@@ -76,9 +89,9 @@ stmtSemantics :: forall f r.
                    Reader Tapes,
                    Writer Outputs,
                    Writer Views,
-                   State VarContext
+                   State (EvalState f)
                    ] r,
-                  Proper f, Functor f, Traversable f) =>
+                  Proper f, Functor f, Traversable f, Pretty1 f) =>
                  f (Statement f) -> Sem r ()
 stmtSemantics fs = case value fs of
     Compute var falg -> do val <- algSemantics (value falg)
@@ -92,9 +105,10 @@ stmtSemantics fs = case value fs of
                        recordViews (value var) val (value p2s)
                        modify $ bind (value var) (p1s <> value p2s, val)
     Output var -> do (ps, val) <- gets $ uslkup var
-                     if null $ parties ps
-                     then error "Not implemented: Output at partyset Top!"
-                     else traverse_ (\party -> tell $ Outputs $ singleton party (singleton (value var) val)) $ parties ps
+                     when (null $ parties ps)
+                       $ error $ "Not implemented: Output " ++ pretty var ++ " at partyset Top!"
+                     psMap <- gets aliases
+                     traverse_ (\party -> tell $ Outputs $ singleton (dealias psMap party) (singleton (value var) val)) $ parties ps
     Oblivious var p2s body -> do let semanticBody (ObvBody fc0 fc1 fv) = do (_, selection) <- gets $ uslkup fv
                                                                             sequence $ semanticChoice <$> bool fc0 fc1 selection
                                      semanticChoice :: ObvChoice f -> Sem r Variable
@@ -104,10 +118,40 @@ stmtSemantics fs = case value fs of
                                  (_, val) <- gets $ uslkup vSend
                                  modify $ bind (value var) (value p2s, val)
                                  recordViews (value var) val (value p2s)
+    Declaration fname pargs body -> do es@EvalState{funcContext} <- get
+                                       put es{ funcContext = insert (value fname) (flattenPargs pargs, body) funcContext }
+    Call fname pargs returns -> do evalST <- get
+                                   let (reqArgs, prog) = fromMaybe (error $ "No such function " ++ pretty fname ++ ".")
+                                                         . (!? value fname) . funcContext $ evalST
+                                   argValues <- traverse (uncurry unpackPargs) pargs
+                                   let argMap = zipWith coalescePargs reqArgs argValues
+                                   put mempty{ varContext = fromList $ concatMap snd argMap
+                                             , aliases = fromList $ fst <$> argMap }
+                                   semantics prog
+                                   possibleReturns <- gets varContext
+                                   put evalST
+                                   traverse_ ( \(newVar, funcVar) -> let errorCase = error $ pretty fname ++ " doesn't bind " ++ pretty funcVar ++ "."
+                                                                         goodCase = modify . bind (value newVar)
+                                                                     in maybe errorCase goodCase $ possibleReturns !? value funcVar
+                                             ) returns
   where recordViews :: Variable -> Bool -> PartySet -> Sem r ()
-        recordViews var b = traverse_ (\party -> tell
-            Views{viewsMap = singleton party $ singleton var b}
-          ) . parties
+        recordViews var b (Parties ps) | null ps = error "Not implemented: Send to partyset Top!"
+                                       | otherwise = do psMap <- gets aliases
+                                                        traverse_ (
+                                                            \party -> tell Views{viewsMap = singleton (dealias psMap party) $ singleton var [b]}
+                                                          ) ps
+        flattenPargs :: [(f Party, [f Variable])] -> [(Party, [Variable])]
+        flattenPargs = (value <$$$>) . (first value <$>)
+        unpackPargs :: f Party -> [f Variable] -> Sem r (Party, [Bool])
+        unpackPargs party vars = sequence (value party, traverse (unpackParg party) vars)
+        unpackParg :: f Party -> f Variable -> Sem r Bool
+        unpackParg party var = do (ps, val) <- gets $ uslkup var
+                                  unless(value party `isElementOf` ps)
+                                    $ error $ "Variable " ++ pretty var ++ " cannot be used as an argument by " ++ pretty party
+                                      ++ ", they don't have it."
+                                  return val
+        coalescePargs (funcParty, args) (realParty, vals) = ( (funcParty, Identity realParty),
+                                                             zipWith (\var val -> (var, (Pty.singleton funcParty, val))) args vals )
 
 
 algSemantics :: forall f r.
@@ -116,9 +160,9 @@ algSemantics :: forall f r.
                    Reader Tapes,
                    Writer Outputs,
                    Writer Views,
-                   State VarContext
+                   State (EvalState f)
                    ] r,
-                  Proper f, Functor f) =>
+                  Proper f, Functor f, Pretty1 f) =>
                 Algebra f -> Sem r (PartySet, Bool)
 algSemantics (Literal b) = return (owners b, bit $ value b)
 algSemantics (Var var) = gets $ uslkup var
@@ -130,16 +174,17 @@ algSemantics (And a1 a2) = do (ps1, v1) <- algSemantics $ value a1
                               return (fromJust $ ps1 `intersect` ps2, v1 && v2)
 algSemantics (Not alg) = do not <$$> algSemantics (value alg)
 
-deterministicEvaluation' :: (Proper f, Functor f, Traversable f) =>
-                            Program f -> Inputs -> Tapes -> (VarContext, (Outputs, Views))
+deterministicEvaluation' :: forall f.
+                            (Proper f, Functor f, Traversable f, Pretty1 f) =>
+                            Program f -> Inputs -> Tapes -> (EvalState f, (Outputs, Views))
 deterministicEvaluation' p is ts =
-  let (vc, (views, (outputs, ()))) = run . runState (VarContext empty)
+  let (vc, (views, (outputs, ()))) = run . runState (mempty @(EvalState f))
                                    . runWriter @Views . runWriter @Outputs
                                    . runReader ts . runReader is
                                    $ semantics p
   in (vc, (outputs, views))
 
-deterministicEvaluation :: (Proper f, Functor f, Traversable f) =>
+deterministicEvaluation :: (Proper f, Functor f, Traversable f, Pretty1 f) =>
                            Program f -> Inputs -> Tapes -> (Outputs, Views)
 deterministicEvaluation p is ts =
   let (_, ret) = deterministicEvaluation' p is ts

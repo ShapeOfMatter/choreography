@@ -1,5 +1,6 @@
 module Tests where
 
+import Data.Functor.Identity (Identity(..))
 import Data.List (nub)
 import Data.Map.Strict (fromList, singleton, empty)
 import qualified Data.Set as Set
@@ -119,7 +120,7 @@ testOutput = testProperty "Test Output" $ (outputs, views) === deterministicEval
         inputs = Inputs $ singleton (Variable "a") True
         tapes = Tapes empty
         views = Views empty
-        outputs = Outputs $ singleton p2 $ singleton (Variable "a") True
+        outputs = Outputs $ singleton (Identity p2) $ singleton (Variable "a") True
 
 testSend :: Test
 testSend = testProperty "Test Send" $ (outputs, views) === deterministicEvaluation program inputs tapes
@@ -129,7 +130,7 @@ testSend = testProperty "Test Send" $ (outputs, views) === deterministicEvaluati
         \SEND a TO P2"
         inputs = Inputs empty
         tapes = Tapes empty
-        views = Views $ singleton p2 $ singleton (Variable "a") True
+        views = Views $ singleton (Identity p2) $ singleton (Variable "a") [True]
         outputs = Outputs empty
 
 testObliv :: Test
@@ -142,7 +143,7 @@ testObliv = testProperty "Test Obliv" $ do -- the gen monad
         \b = OBLIVIOUSLY [no,yes]?a FOR P2\n\
         \OUTPUT b")
   let program = either error id $ either (error . show) id program'
-  let outputs = Outputs $ singleton p2 $ singleton (Variable "b") b
+  let outputs = Outputs $ singleton (Identity p2) $ singleton (Variable "b") b
   let (observed, _) = deterministicEvaluation program (Inputs empty) (Tapes empty)
   return $ outputs === observed
 
@@ -158,9 +159,9 @@ example = testProperty "An easy example" $ (outputs, views) === deterministicEva
         \OUTPUT y"
         inputs = Inputs $ singleton (Variable "sec") True
         tapes = Tapes $ singleton (Variable "rand") True
-        views = Views $ fromList [(p1, fromList[(Variable "comp1", True),
-                                                (Variable "rand", True)] )]
-        outputs = Outputs $ singleton p1 $ singleton (Variable "y") True
+        views = Views $ fromList [(Identity p1, fromList[(Variable "comp1", [True]),
+                                                          (Variable "rand", [True])] )]
+        outputs = Outputs $ singleton (Identity p1) $ singleton (Variable "y") True
 
 pipeline :: Test
 pipeline = testProperty "3partyXOR.cho gives correct outputs" $ ioProperty do
@@ -180,7 +181,7 @@ pipeline = testProperty "3partyXOR.cho gives correct outputs" $ ioProperty do
                                    ,Variable "h2_s1"
                                    ,Variable "h2_s2"] `zip` randomness
     let y = foldl (/=) False secrets
-    let outputs = Outputs $ fromList $ [c, h1, h2] `zip` repeat (singleton (Variable "y") y)
+    let outputs = Outputs $ fromList $ [Identity c, Identity h1, Identity h2] `zip` repeat (singleton (Variable "y") y)
     let (observed, _) = deterministicEvaluation program inputs tapes
     return $ observed === outputs
 
@@ -206,7 +207,7 @@ oneOfFourOTIO = do
                                    ,Variable "k2_0"
                                    ,Variable "k2_1"] `zip` randomness
     let y = messages !! selection
-    let outputs = Outputs $ fromList $ [p2] `zip` repeat (singleton (Variable "final") y)
+    let outputs = Outputs $ fromList $ [Identity p2] `zip` repeat (singleton (Variable "final") y)
     let (vc, (observed, _)) = deterministicEvaluation' program inputs tapes
     return $ counterexample (pretty vc) $ observed == outputs
 
@@ -228,7 +229,7 @@ gmwAndGatesIO = do
                                    ,Variable "g1_s1"
                                    ,Variable "g2_s2"] `zip` randomness
     let y = and secrets
-    let outputs = Outputs $ fromList $ [p1, p2] `zip` repeat (singleton (Variable "y") y)
+    let outputs = Outputs $ fromList $ [Identity p1, Identity p2] `zip` repeat (singleton (Variable "y") y)
     let (vc, (observed, _)) = deterministicEvaluation' program inputs tapes
     return $ counterexample (pretty vc) $ observed == outputs
 

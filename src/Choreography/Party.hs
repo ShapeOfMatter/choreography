@@ -1,11 +1,14 @@
 module Choreography.Party
 where
 
+import Data.Functor.Identity (Identity(..))
 import Data.List (intercalate)
+import Data.Map.Strict ((!?), Map)
 import Data.Set (disjoint, empty, Set, toList)
 import qualified Data.Set as Set
 
 import Utils (Pretty, pretty)
+import Data.Maybe (fromMaybe)
 
 newtype Party = Party {party :: String}
            deriving (Eq, Ord, Show)
@@ -51,6 +54,14 @@ isSubsetOf :: PartySet -> PartySet -> Bool
 isElementOf :: Party -> PartySet -> Bool
 p `isElementOf` (Parties ps) | null ps = True
                              | otherwise = p `Set.member` ps
+
+type Concrete = Identity
+
+dealiass :: Map Party (Concrete Party) -> PartySet -> Concrete PartySet
+dealiass m (Parties ps) = Identity $ Parties $ (runIdentity . dealias m) `Set.map` ps
+
+dealias :: Map Party (Concrete Party) -> Party -> Concrete Party
+dealias m p = fromMaybe (Identity p) $ m !? p
 
 p1 :: Party
 p1 = Party "P1"  -- "ℙ𝟙"
