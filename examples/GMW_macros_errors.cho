@@ -1,3 +1,9 @@
+-- ERRORS:
+-- reusing randomness
+-- sending to the wrong party
+-- sending the wrong thing (e.g. secret input instead of shares)
+-- reversing gate outputs (does it matter?)
+-- revealing the wrong thing (e.g. secret inputs)
 
 -- ERROR: reused randomness
 s1 = FLIP @P1
