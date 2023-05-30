@@ -27,11 +27,15 @@ cabal shells _should_ inherit the `$PATH` _etc_ of their parent,
 so if you have a venv environment active with numpy and scikit-learn, you _should_ be ok.
 One test in the suite of "core" semantics is currently failing, and probably will be until we revisit encryption.
 
-The main executable will run a .cho file by the python-semantics.
+Two executables will be built: `haskell-semantics` and `python-semantics`.
+The python stack is currently a bodge; while the test cases are passing
+I was pretty fast-and-loose getting it to compile and we shouldn't trust it until I've revisited it.
+
+Each executable will run a .cho file using the specified semantics.
 Optional trailing `1` or `0` arguments will be used as secret inputs, which are otherwise all set to `1`.
 
 ```bash
-$>  cabal run helloworld examples/3partyXOR.cho
+$>  cabal run haskell-semantics examples/3partyXOR.cho
 Inputs:  [(Variable {variable = "c_in"},True),(Variable {variable = "h1_in"},True),(Variable {variable = "h2_in"},True)]
 Tapes:  [(Variable {variable = "c_s1"},True),(Variable {variable = "c_s2"},True),(Variable {variable = "h1_s1"},False),(Variable {variable = "h1_s2"},True),(Variable {variable = "h2_s1"},True),(Variable {variable = "h2_s2"},True)]
 Views:  [(Party {party = "C"},[(Variable {variable = "c_s1"},True),(Variable {variable = "c_s2"},True),(Variable {variable = "h1_s3"},False),(Variable {variable = "h1_sum"},False),(Variable {variable = "h2_s3"},True),(Variable {variable = "h2_sum"},True)]),(Party {party = "H1"},[(Variable {variable = "c_s1"},True),(Variable {variable = "c_sum"},False),(Variable {variable = "h1_s1"},False),(Variable {variable = "h1_s2"},True),(Variable {variable = "h2_s1"},True),(Variable {variable = "h2_sum"},True)]),(Party {party = "H2"},[(Variable {variable = "c_s2"},True),(Variable {variable = "c_sum"},False),(Variable {variable = "h1_s2"},True),(Variable {variable = "h1_sum"},False),(Variable {variable = "h2_s1"},True),(Variable {variable = "h2_s2"},True)])]
@@ -45,7 +49,7 @@ Views:  [(Party {party = "C"},[(Variable {variable = "c_s1"},False),(Variable {v
 Outputs:  [(Party {party = "C"},[(Variable {variable = "y"},True)]),(Party {party = "H1"},[(Variable {variable = "y"},True)]),(Party {party = "H2"},[(Variable {variable = "y"},True)])]
 ```
 
-The actual python code that gets used gets written to `.temp.py`, in case you want to inspect it.
+Under the python semantics, the actual python code that gets used gets written to `.temp.py`, in case you want to inspect it.
 
 ## Notes
 
