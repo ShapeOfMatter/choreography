@@ -96,7 +96,7 @@ for xi in xs:
 
 emit()
 for yi in ys:
-    emit(f'DO secret_share(P2({yi}), P1()) GET({yi}_1=s1, {yi}_2=s2)')
+    emit(f'DO secret_share(P2({yi}), P1()) GET({yi}_1=s2, {yi}_2=s1)')
 
 emit()
 emit('-- Adder circuit')
