@@ -1,18 +1,24 @@
 -- ERRORS:
 -- reusing randomness
    -- select random subset of flips by honest party
-   -- replace them with a constant (or a single flip?)
+   -- replace them with a constant, or a single flip, or functions of a single flip, or with non-uniform bits.
 -- sending to the wrong party
    -- select a random subset of sends to honest parties
-   -- add identical sends, but to the corrupt party
+   -- add Corrupt to the list of recipients.
+   -- Requires three or more parties.
 -- sending the wrong thing (e.g. secret input instead of shares)
    -- select a random location in the program
-   -- add a send of a random honest secret to a corrupt party
+   -- add a send of a random honest secret (input or wire) to a corrupt party
+-- sending the wrong thing (e.g. fuzzed secret input)
+   -- add a send of a random honest secret XOR'd with a theta-bernolli.
+-- sending the wrong thing (e.g. invertable function of secret input)
 -- reversing gate outputs (does it matter?)
    -- don't do it?
 -- revealing the wrong thing (e.g. secret inputs)
    -- select a random location in the program
-   -- add an output of a secret (does this make sense?)
+   -- add an output of a secret.
+   -- This won't generate insecure programs.
+   -- removing outputs would, but changes the ideal functionality. do we want to do that?
 
 -- ERROR: reused randomness
 s1 = FLIP @P1
