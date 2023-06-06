@@ -1,13 +1,22 @@
 -- ERRORS:
 -- reusing randomness
+   -- select random subset of flips by honest party
+   -- replace them with a constant (or a single flip?)
 -- sending to the wrong party
+   -- select a random subset of sends to honest parties
+   -- add identical sends, but to the corrupt party
 -- sending the wrong thing (e.g. secret input instead of shares)
+   -- select a random location in the program
+   -- add a send of a random honest secret to a corrupt party
 -- reversing gate outputs (does it matter?)
+   -- don't do it?
 -- revealing the wrong thing (e.g. secret inputs)
+   -- select a random location in the program
+   -- add an output of a secret (does this make sense?)
 
 -- ERROR: reused randomness
 s1 = FLIP @P1
-MACRO secretShare(P1(x), P2()) AS
+MACRO secret_share(P1(x), P2()) AS
   --s1 = FLIP @P1
   s2 = x + s1
   SEND s1 TO P2
@@ -15,7 +24,7 @@ ENDMACRO
 
 -- ERROR: reused randomness
 out1 = FLIP @P1
-MACRO andGMW(P1(x1, y1), P2(x2, y2)) AS
+MACRO and_gmw(P1(x1, y1), P2(x2, y2)) AS
   --out1 = FLIP @P1
   g1_s2_00 = out1 + ((x1 + 0) ^ (y1 + 0))
   g1_s2_01 = out1 + ((x1 + 0) ^ (y1 + 1))
@@ -40,21 +49,21 @@ h2_in = SECRET @P2
 SEND c_in TO P2
 
 -- Set up shares
-DO secretShare(P1(c_in), P2) GET(c_s1=s1, c_s2=s2)
-DO secretShare(P2(h1_in), P1) GET(h1_s1=s1, h1_s2=s2)
+DO secret_share(P1(c_in), P2()) GET(c_s1=s1, c_s2=s2)
+DO secret_share(P2(h1_in), P1()) GET(h1_s1=s1, h1_s2=s2)
 
 -- ERROR: reversing shares
-DO secretShare(P2(h2_in), P1) GET(h2_s1=s2, h2_s2=s1)
---DO secretShare(P2(h2_in), P1) GET(h2_s1=s1, h2_s2=s2)
+DO secret_share(P2(h2_in), P1()) GET(h2_s1=s2, h2_s2=s1)
+--DO secret_share(P2(h2_in), P1()) GET(h2_s1=s1, h2_s2=s2)
 
 -- First AND gate: c_in * h1_in
 -- P1 sets up, P2 chooses.
 -- ERROR? Reversing outputs
-DO andGMW(P1(c_s1, h1_s1), P2(c_s2, h1_s2)) GET(g1=out1, g2=out2)
-DO andGMW(P1(c_s1, h1_s1), P2(c_s2, h1_s2)) GET(g1=out2, g2=out1)
+DO and_gmw(P1(c_s1, h1_s1), P2(c_s2, h1_s2)) GET(g1=out1, g2=out2)
+DO and_gmw(P1(c_s1, h1_s1), P2(c_s2, h1_s2)) GET(g1=out2, g2=out1)
 
 -- Second AND gate: g * h2_in
-DO andGMW(P1(g1, h2_s1), P2(g2, h2_s2)) GET(o1=out1, o2=out2)
+DO and_gmw(P1(g1, h2_s1), P2(g2, h2_s2)) GET(o1=out1, o2=out2)
 
 -- Reveal
 DO reveal(P1(o1), P2(o2)) GET()
