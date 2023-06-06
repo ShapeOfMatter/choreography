@@ -38,8 +38,12 @@ def gen_adder(xs, ys):
         outs.append(out)
         
         # carry = ((a + carry) * (b + carry) + carry) % 2
-        carry1 = gen_xor(a, carry)
-        carry2 = gen_xor(b, carry)
+        if carry is None:
+            carry1 = a
+            carry2 = b
+        else:
+            carry1 = gen_xor(a, carry)
+            carry2 = gen_xor(b, carry)
         carry3 = gen_and(carry1, carry2)
         if carry is None:
             carry = carry3
