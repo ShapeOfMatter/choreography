@@ -1,4 +1,5 @@
-f = open("adder_32.cho", "w")
+BITS = 32
+f = open(f"adder_{BITS}.cho", "w")
 
 
 gn = 0
@@ -18,7 +19,7 @@ def gen_xor(a, b):
 
 def gen_and(a, b):
     out = gensym('g')
-    emit(f'DO andGMW(P1({a}_1, {b}_1), P2({a}_2, {b}_2)) GET({out}_1=out1, {out}_2=out2)')
+    emit(f'DO and_gmw(P1({a}_1, {b}_1), P2({a}_2, {b}_2)) GET({out}_1=out1, {out}_2=out2)')
     return out
 
 def gen_adder(xs, ys):
@@ -53,13 +54,13 @@ def gen_adder(xs, ys):
     return outs
 
 header = """
-MACRO secretShare(P1(x), P2()) AS
+MACRO secret_share(P1(x), P2()) AS
   s1 = FLIP @P1
   s2 = x + s1
   SEND s1 TO P2
 ENDMACRO
 
-MACRO andGMW(P1(x1, y1), P2(x2, y2)) AS
+MACRO and_gmw(P1(x1, y1), P2(x2, y2)) AS
   out1 = FLIP @P1
   g1_s2_00 = out1 + ((x1 + 0) ^ (y1 + 0))
   g1_s2_01 = out1 + ((x1 + 0) ^ (y1 + 1))
@@ -77,8 +78,8 @@ ENDMACRO
 """
 emit(header)
 
-xs = [f'x{i}' for i in range(32)]
-ys = [f'y{i}' for i in range(32)]
+xs = [f'x{i}' for i in range(BITS)]
+ys = [f'y{i}' for i in range(BITS)]
 
 emit('-- Read secrets')
 for xi in xs:
@@ -91,11 +92,11 @@ for yi in ys:
 emit()
 emit('-- Set up shares')
 for xi in xs:
-    emit(f'DO secretShare(P1({xi}, P2) GET({xi}_1=s1, {xi}_2=s2)')
+    emit(f'DO secret_share(P1({xi}), P2()) GET({xi}_1=s1, {xi}_2=s2)')
 
 emit()
 for yi in ys:
-    emit(f'DO secretShare(P2({yi}, P1) GET({yi}_1=s1, {yi}_2=s2)')
+    emit(f'DO secret_share(P2({yi}), P1()) GET({yi}_1=s1, {yi}_2=s2)')
 
 emit()
 emit('-- Adder circuit')
