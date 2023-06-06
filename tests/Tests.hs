@@ -1,8 +1,11 @@
-module Tests where
+module Tests (
+  tests,
+  tests'
+) where
 
 import Data.Functor.Identity (Identity(..))
 import Data.List (nub)
-import Data.Map.Strict ((!), fromList, singleton, empty, member)
+import Data.Map.Strict ((!), fromList, singleton, empty)
 import qualified Data.Set as Set
 import Distribution.TestSuite.QuickCheck
 import Test.QuickCheck ((===), Arbitrary (arbitrary), chooseInt, counterexample, Gen, ioProperty, Property, vectorOf)
@@ -19,21 +22,25 @@ import Utils
 
 
 tests :: IO [Test]
-tests = do return [ tautology
-                  , testEasyCompute
-                  , testEasySecret
-                  , testEasyFlip
-                  , testEasySend
-                  , testEasyObliv
-                  , testLines
-                  , testOutput
-                  , testSend
-                  , testObliv
-                  , example
-                  , pipeline
-                  , oneOfFourOT
-                  , gmwAndGates
-                  , miniFunc]
+tests = do return tests'
+
+tests' :: [Test]
+tests' = [ tautology
+         , testEasyCompute
+         , testEasySecret
+         , testEasyFlip
+         , testEasySend
+         , testEasyObliv
+         , testLines
+         , testOutput
+         , testSend
+         , testObliv
+         , example
+         , pipeline
+         , oneOfFourOT
+         , gmwAndGates
+         , miniFunc
+         , gmwMacroGates]
 
 
 tautology :: Test
@@ -119,7 +126,7 @@ testOutput = testProperty "Test Output" $ (outputs, views) === deterministicEval
         \a = SECRET @P2\n\
         \OUTPUT a"
         inputs = Inputs $ singleton (Variable "a") True
-        tapes = Tapes empty
+        tapes = []
         views = Views empty
         outputs = Outputs $ singleton (Identity p2) $ singleton (Variable "a") True
 
@@ -130,7 +137,7 @@ testSend = testProperty "Test Send" $ (outputs, views) === deterministicEvaluati
         \a = 1\n\
         \SEND a TO P2"
         inputs = Inputs empty
-        tapes = Tapes empty
+        tapes = []
         views = Views $ singleton (Identity p2) $ singleton (Variable "a") [True]
         outputs = Outputs empty
 
@@ -145,7 +152,7 @@ testObliv = testProperty "Test Obliv" $ do -- the gen monad
         \OUTPUT b")
   let program = either error id $ either (error . show) id program'
   let outputs = Outputs $ singleton (Identity p2) $ singleton (Variable "b") b
-  let (observed, _) = deterministicEvaluation program (Inputs empty) (Tapes empty)
+  let (observed, _) = deterministicEvaluation program (Inputs empty) []
   return $ outputs === observed
 
 example :: Test
@@ -159,7 +166,7 @@ example = testProperty "An easy example" $ (outputs, views) === deterministicEva
         \y = rand ^ comp1\n\
         \OUTPUT y"
         inputs = Inputs $ singleton (Variable "sec") True
-        tapes = Tapes $ singleton (Variable "rand") True
+        tapes = [True]
         views = Views $ fromList [(Identity p1, fromList[(Variable "comp1", [True]),
                                                           (Variable "rand", [True])] )]
         outputs = Outputs $ singleton (Identity p1) $ singleton (Variable "y") True
@@ -169,18 +176,12 @@ pipeline = testProperty "3partyXOR.cho gives correct outputs" $ ioProperty do
   program' <- parseFromFile programParser "examples/3partyXOR.cho"
   let program = either error id $ either (error . show) id $ validate empty <$> program'
   return do  -- The Gen Monad!
-    let (c, h1, h2) = (Party "C", Party "H1", Party "H2")
+    let (c, h1, h2) = (corrupt, Party "H1", Party "H2")
     secrets <- vectorOf 3 (arbitrary @Bool)
     let inputs = Inputs $ fromList $ [Variable "c_in"
                                      ,Variable "h1_in"
                                      ,Variable "h2_in"] `zip` secrets
-    randomness <- vectorOf 6 (arbitrary @Bool)
-    let tapes = Tapes $ fromList $ [Variable "c_s1"
-                                   ,Variable "c_s2"
-                                   ,Variable "h1_s1"
-                                   ,Variable "h1_s2"
-                                   ,Variable "h2_s1"
-                                   ,Variable "h2_s2"] `zip` randomness
+    tapes <- vectorOf 6 (arbitrary @Bool)
     let y = foldl (/=) False secrets
     let outputs = Outputs $ fromList $ [Identity c, Identity h1, Identity h2] `zip` repeat (singleton (Variable "y") y)
     let (observed, _) = deterministicEvaluation program inputs tapes
@@ -202,40 +203,33 @@ oneOfFourOTIO = do
                                      ,Variable "option_11"
                                      ,Variable "choice_i1"
                                      ,Variable "choice_i2"] `zip` (messages <> sAsBits)
-    randomness <- vectorOf 4 (arbitrary @Bool)
-    let tapes = Tapes $ fromList $ [Variable "k1_0"
-                                   ,Variable "k1_1"
-                                   ,Variable "k2_0"
-                                   ,Variable "k2_1"] `zip` randomness
+    tapes <- vectorOf 4 (arbitrary @Bool)
     let y = messages !! selection
     let outputs = Outputs $ fromList $ [Identity p2] `zip` repeat (singleton (Variable "final") y)
     let (vc, (observed, _)) = deterministicEvaluation' program inputs tapes
     return $ counterexample (pretty vc) $ observed == outputs
 
 gmwAndGates :: Test
-gmwAndGates = testProperty "Two party three-arg AND in GMW" $ ioProperty gmwAndGatesIO
-gmwAndGatesIO :: IO (Gen Property)
-gmwAndGatesIO = do
-  program' <- parseFromFile programParser "examples/3party2andGMW.cho"
+gmwAndGates = testProperty "Two party three-arg AND in GMW" $ ioProperty $ gmwAndGatesIO "examples/3party2andGMW.cho"
+gmwMacroGates :: Test
+gmwMacroGates = testProperty "Two party three-arg AND in GMW using macros" $ ioProperty $ gmwAndGatesIO "examples/GMW_macros.cho"
+gmwAndGatesIO :: String -> IO (Gen Property)
+gmwAndGatesIO fileName = do
+  program' <- parseFromFile programParser fileName
   let program = either error id $ either (error . show) id $ validate empty <$> program'
   return do  -- The Gen Monad!
     secrets <- vectorOf 3 (arbitrary @Bool)
     let inputs = Inputs $ fromList $ [Variable "c_in"
                                      ,Variable "h1_in"
                                      ,Variable "h2_in"] `zip` secrets
-    randomness <- vectorOf 5 (arbitrary @Bool)
-    let tapes = Tapes $ fromList $ [Variable "c_s1"
-                                   ,Variable "h1_s1"
-                                   ,Variable "h2_s1"
-                                   ,Variable "g1_s1"
-                                   ,Variable "g2_s2"] `zip` randomness
+    tapes <- vectorOf 5 (arbitrary @Bool)
     let y = and secrets
     let outputs = Outputs $ fromList $ [Identity p1, Identity p2] `zip` repeat (singleton (Variable "y") y)
     let (vc, (observed, _)) = deterministicEvaluation' program inputs tapes
     return $ counterexample (pretty vc) $ observed == outputs
 
 miniFunc :: Test
-miniFunc = testProperty "Mini functions example" $ ioProperty gmwAndGatesIO
+miniFunc = testProperty "Mini functions example" $ ioProperty miniFuncIO
 miniFuncIO :: IO (Gen Property)
 miniFuncIO = do
   program' <- parseFromFile programParser "examples/miniFunc.cho"
@@ -249,8 +243,8 @@ miniFuncIO = do
     let y = [(Variable "c_out", nCIn)
             ,(Variable "h_out1", nHIn)
             ,(Variable "h_out2", nHIn)]
-    let outputs = Outputs $ fromList [(Identity p1, fromList y), (Identity p2, fromList y)]
-    let views = Views $ fromList [(Identity $ Party "C", fromList [(Variable "na", [nHIn, nHIn])]),
-                                  (Identity $ Party "H", fromList [(Variable "na", [nCIn])])]
+    let outputs = Outputs $ fromList [(Identity corrupt, fromList y), (Identity honest, fromList y)]
+    let views = Views $ fromList [(Identity corrupt, fromList [(Variable "na", [nHIn, nHIn])]),
+                                  (Identity honest, fromList [(Variable "na", [nCIn])])]
     let (vc, (observedO, observedV)) = deterministicEvaluation' program inputs tapes
-    return $ counterexample (pretty vc) $ observedO == outputs && observedV == views
+    return $ counterexample (pretty vc ++ pretty observedO ++ pretty observedV ++ pretty outputs ++ pretty views) $ observedO == outputs && observedV == views

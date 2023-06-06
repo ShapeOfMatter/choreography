@@ -17,9 +17,8 @@ main = do
   let secrets = (toEnum . read @Int <$> fixedInputs) <> repeat True
   let inputs = Inputs $ fromList $ (snd <$> inputVars) `zip` secrets
   putStrLn $ "Inputs:  " ++ show (toList $ inputsMap inputs)
-  randomness <- generate $ vectorOf (sum $ length <$> tapeVars) (arbitrary @Bool)
-  let tapes = Tapes $ fromList $ (snd <$> tapeVars) `zip` randomness
-  putStrLn $ "Tapes:  " ++ show (toList $ tapesMap tapes)
+  tapes <- generate $ vectorOf (sum $ length <$> tapeVars) (arbitrary @Bool)
+  putStrLn $ "Tapes:  " ++ show tapes
   let (os, vs) = deterministicEvaluation program inputs tapes
   putStrLn $ "Views:  " ++ show (toList $ toList <$> viewsMap vs)
   putStrLn $ "Outputs:  " ++ show (toList $ toList <$> outputsMap os)

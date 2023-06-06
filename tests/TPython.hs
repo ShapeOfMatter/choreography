@@ -46,18 +46,13 @@ gmwAndGatesIO = do
     let inputs = Inputs $ fromList $ [Variable "c_in"
                                      ,Variable "h1_in"
                                      ,Variable "h2_in"] `zip` secrets
-    randomness <- vectorOf 5 (arbitrary @Bool)
-    let tapes = Tapes $ fromList $ [Variable "c_s1"
-                                   ,Variable "h1_s1"
-                                   ,Variable "h2_s1"
-                                   ,Variable "g1_s1"
-                                   ,Variable "g2_s2"] `zip` randomness
+    tapes <- vectorOf 5 (arbitrary @Bool)
     let (outputs, views) = deterministicEvaluation program inputs tapes
     return $ ioProperty do -- Back in the IO monad!?
       (os, vs, code) <- runPythonProgram program inputs tapes
       let messages = [ asString code,
                       "inputs = " ++ show (toList $ inputsMap inputs),
-                      "tapes = " ++ show (toList $ tapesMap tapes),
+                      "tapes = " ++ show tapes,
                       "views = " ++ show (concat $ toList <$> viewsMap vs),
                       "outputs = " ++ show (concat $ toList <$> outputsMap os),
                       "expected views = " ++ show (concat $ toList <$> outputsMap outputs)]

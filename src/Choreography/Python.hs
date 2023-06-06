@@ -16,7 +16,7 @@ import Polysemy.State (gets, modify, runState, State)
 import Choreography.AbstractSyntaxTree
 import Choreography.Metadata
 import Choreography.Party
-import Choreography.Semantics (Inputs, inputsMap, Outputs (Outputs), Tapes, tapesMap, Views(Views))
+import Choreography.Semantics (Inputs, inputsMap, Outputs (Outputs), Tapes, Views(Views))
 import Python
 import Utils ((<$$>), litFile, pretty, Pretty1)
 
@@ -113,7 +113,7 @@ asPythonProgram prog ins tps = (header
                                , pmd)
   where (function, pmd@ProgramMetaData{inputVars, tapeVars}) = asPythonFunction prog
         setup = pythonLines $ "inputs = np.array([" ++ intercalate ", " [pretty $ inputsMap ins ! var | (_, var) <- inputVars] ++ "])\n\
-                              \tapes = np.array([" ++ intercalate ", " [pretty $ tapesMap tps ! var | (_, var) <- tapeVars] ++ "])"
+                              \tapes = np.array([" ++ intercalate ", " [pretty t | (t, _) <- tps `zip` tapeVars] ++ "])"
 
 runPythonProgram :: (Proper f, Functor f, Traversable f, Pretty1 f) => Program f -> Inputs -> Tapes -> IO (Outputs, Views, PythonLines)
 runPythonProgram prog ins tps = do PyTrace{outputs, views} <- runPythonCommand @PyTrace code

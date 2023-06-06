@@ -69,3 +69,7 @@ p2 :: Party
 p2 = Party "P2"  -- "ℙ𝟚"
 p3 :: Party
 p3 = Party "P3"  -- "ℙ𝟛"
+honest :: Party
+honest = Party "H"
+corrupt :: Party
+corrupt = Party "C"

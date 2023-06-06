@@ -132,6 +132,7 @@ instance Proper ((,) PartySet) where
   value = snd
 
 data Location = Location { lowners :: PartySet, source :: SourcePos } deriving (Eq, Ord, Show)
+instance Pretty Location where pretty = show
 type Located = (,) Location
 instance Proper Located where
   owners = lowners . fst

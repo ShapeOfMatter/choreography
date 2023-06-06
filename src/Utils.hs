@@ -4,13 +4,16 @@ where
 import Control.Exception (evaluate, Exception, try)
 import Data.Either (fromRight)
 import Data.Functor.Identity (Identity (runIdentity))
+import Data.List (uncons)
 import Data.Map.Strict (adjust, Map)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromJust, fromMaybe)
 import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Quote as THQuote
-import Polysemy (Sem)
+import Polysemy (reinterpret, Sem)
 import Polysemy.Fail (Fail, runFail)
-import Text.Parsec hiding (try)
+import Polysemy.Input (Input(..))
+import Polysemy.State (get, put, runState)
+import Text.Parsec hiding (try, uncons)
 
 
 class Pretty a where
@@ -23,8 +26,8 @@ instance Pretty Bool where
   pretty r = case (numerator r, denominator r) of
                (n, 1) -> show n
                (n, d) -> show n <> "/" <> show d-}
-{-instance (Pretty a, Pretty b) => Pretty (a, b) where
-  pretty (k, v) = pretty k <> ": " <> pretty v-}
+instance Pretty SourcePos where
+  pretty = show
 
 prettyPrint :: (Pretty a) => a -> IO ()
 prettyPrint = putStrLn . pretty
@@ -33,8 +36,8 @@ class Pretty1 (f :: * -> *) where
   prettyf :: f String -> String
 instance Pretty1 Identity where
   prettyf = runIdentity
-instance Pretty1 ((,) meta) where
-  prettyf = snd
+instance (Pretty meta) => Pretty1 ((,) meta) where
+  prettyf (k, s) = pretty k <> ": " <> s
 instance Pretty1 [] where
   prettyf = unlines
 instance Pretty1 Maybe where
@@ -97,3 +100,15 @@ litFile = THQuote.quoteFile $ THQuote.QuasiQuoter{ THQuote.quoteExp = return . T
                                                  , THQuote.quoteType=undefined
                                                  , THQuote.quoteDec=undefined }
 
+runInputUnsafe
+    :: [i]
+    -> Sem (Input i ': r) a
+    -> Sem r a
+runInputUnsafe is = fmap snd . runState is . reinterpret
+  (\case
+      Input -> do
+        sss <- get
+        let (s, ss) = fromJust $ uncons sss
+        put ss
+        pure s
+  )

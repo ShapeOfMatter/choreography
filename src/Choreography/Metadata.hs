@@ -7,7 +7,7 @@ import Data.Maybe (fromMaybe)
 import Data.Set (toList)
 import Polysemy (Members, run, Sem)
 import Polysemy.Writer (runWriter, tell, Writer)
-import Polysemy.State (get, gets, modify, put, evalState, runState, State)
+import Polysemy.State (gets, modify, evalState, State)
 
 import Choreography.AbstractSyntaxTree
 import Choreography.Party hiding (insert, singleton)
