@@ -41,23 +41,23 @@ y6 = SECRET @P2
 y7 = SECRET @P2
 
 -- Set up shares
-DO secret_share(P1(x0), P2()) GET(x0_1=s1, x0_2=s2)
-DO secret_share(P1(x1), P2()) GET(x1_1=s1, x1_2=s2)
-DO secret_share(P1(x2), P2()) GET(x2_1=s1, x2_2=s2)
-DO secret_share(P1(x3), P2()) GET(x3_1=s1, x3_2=s2)
-DO secret_share(P1(x4), P2()) GET(x4_1=s1, x4_2=s2)
-DO secret_share(P1(x5), P2()) GET(x5_1=s1, x5_2=s2)
-DO secret_share(P1(x6), P2()) GET(x6_1=s1, x6_2=s2)
-DO secret_share(P1(x7), P2()) GET(x7_1=s1, x7_2=s2)
+DO secret_share(P1(x0), P2()) GET(x0_1=s2, x0_2=s1)
+DO secret_share(P1(x1), P2()) GET(x1_1=s2, x1_2=s1)
+DO secret_share(P1(x2), P2()) GET(x2_1=s2, x2_2=s1)
+DO secret_share(P1(x3), P2()) GET(x3_1=s2, x3_2=s1)
+DO secret_share(P1(x4), P2()) GET(x4_1=s2, x4_2=s1)
+DO secret_share(P1(x5), P2()) GET(x5_1=s2, x5_2=s1)
+DO secret_share(P1(x6), P2()) GET(x6_1=s2, x6_2=s1)
+DO secret_share(P1(x7), P2()) GET(x7_1=s2, x7_2=s1)
 
-DO secret_share(P2(y0), P1()) GET(y0_1=s2, y0_2=s1)
-DO secret_share(P2(y1), P1()) GET(y1_1=s2, y1_2=s1)
-DO secret_share(P2(y2), P1()) GET(y2_1=s2, y2_2=s1)
-DO secret_share(P2(y3), P1()) GET(y3_1=s2, y3_2=s1)
-DO secret_share(P2(y4), P1()) GET(y4_1=s2, y4_2=s1)
-DO secret_share(P2(y5), P1()) GET(y5_1=s2, y5_2=s1)
-DO secret_share(P2(y6), P1()) GET(y6_1=s2, y6_2=s1)
-DO secret_share(P2(y7), P1()) GET(y7_1=s2, y7_2=s1)
+DO secret_share(P2(y0), P1()) GET(y0_1=s1, y0_2=s2)
+DO secret_share(P2(y1), P1()) GET(y1_1=s1, y1_2=s2)
+DO secret_share(P2(y2), P1()) GET(y2_1=s1, y2_2=s2)
+DO secret_share(P2(y3), P1()) GET(y3_1=s1, y3_2=s2)
+DO secret_share(P2(y4), P1()) GET(y4_1=s1, y4_2=s2)
+DO secret_share(P2(y5), P1()) GET(y5_1=s1, y5_2=s2)
+DO secret_share(P2(y6), P1()) GET(y6_1=s1, y6_2=s2)
+DO secret_share(P2(y7), P1()) GET(y7_1=s1, y7_2=s2)
 
 -- Adder circuit
 g1_1 = x7_1 + y7_1
