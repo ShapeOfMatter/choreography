@@ -18,7 +18,6 @@ MACRO reveal(P1(x1), P2(x2)) AS
   SEND x1 TO P2
   SEND x2 TO P1
   y = x1 + x2
-  OUTPUT y
 ENDMACRO
 
 -- Read secrets
@@ -502,35 +501,67 @@ g188_1 = g187_1 + g182_1
 g188_2 = g187_2 + g182_2
 
 -- Reveal output
-DO reveal(P1(g1_1), P2(g1_2)) GET()
-DO reveal(P1(g4_1), P2(g4_2)) GET()
-DO reveal(P1(g10_1), P2(g10_2)) GET()
-DO reveal(P1(g16_1), P2(g16_2)) GET()
-DO reveal(P1(g22_1), P2(g22_2)) GET()
-DO reveal(P1(g28_1), P2(g28_2)) GET()
-DO reveal(P1(g34_1), P2(g34_2)) GET()
-DO reveal(P1(g40_1), P2(g40_2)) GET()
-DO reveal(P1(g46_1), P2(g46_2)) GET()
-DO reveal(P1(g52_1), P2(g52_2)) GET()
-DO reveal(P1(g58_1), P2(g58_2)) GET()
-DO reveal(P1(g64_1), P2(g64_2)) GET()
-DO reveal(P1(g70_1), P2(g70_2)) GET()
-DO reveal(P1(g76_1), P2(g76_2)) GET()
-DO reveal(P1(g82_1), P2(g82_2)) GET()
-DO reveal(P1(g88_1), P2(g88_2)) GET()
-DO reveal(P1(g94_1), P2(g94_2)) GET()
-DO reveal(P1(g100_1), P2(g100_2)) GET()
-DO reveal(P1(g106_1), P2(g106_2)) GET()
-DO reveal(P1(g112_1), P2(g112_2)) GET()
-DO reveal(P1(g118_1), P2(g118_2)) GET()
-DO reveal(P1(g124_1), P2(g124_2)) GET()
-DO reveal(P1(g130_1), P2(g130_2)) GET()
-DO reveal(P1(g136_1), P2(g136_2)) GET()
-DO reveal(P1(g142_1), P2(g142_2)) GET()
-DO reveal(P1(g148_1), P2(g148_2)) GET()
-DO reveal(P1(g154_1), P2(g154_2)) GET()
-DO reveal(P1(g160_1), P2(g160_2)) GET()
-DO reveal(P1(g166_1), P2(g166_2)) GET()
-DO reveal(P1(g172_1), P2(g172_2)) GET()
-DO reveal(P1(g178_1), P2(g178_2)) GET()
-DO reveal(P1(g184_1), P2(g184_2)) GET()
+DO reveal(P1(g1_1), P2(g1_2)) GET(r0=y)
+OUTPUT r0
+DO reveal(P1(g4_1), P2(g4_2)) GET(r1=y)
+OUTPUT r1
+DO reveal(P1(g10_1), P2(g10_2)) GET(r2=y)
+OUTPUT r2
+DO reveal(P1(g16_1), P2(g16_2)) GET(r3=y)
+OUTPUT r3
+DO reveal(P1(g22_1), P2(g22_2)) GET(r4=y)
+OUTPUT r4
+DO reveal(P1(g28_1), P2(g28_2)) GET(r5=y)
+OUTPUT r5
+DO reveal(P1(g34_1), P2(g34_2)) GET(r6=y)
+OUTPUT r6
+DO reveal(P1(g40_1), P2(g40_2)) GET(r7=y)
+OUTPUT r7
+DO reveal(P1(g46_1), P2(g46_2)) GET(r8=y)
+OUTPUT r8
+DO reveal(P1(g52_1), P2(g52_2)) GET(r9=y)
+OUTPUT r9
+DO reveal(P1(g58_1), P2(g58_2)) GET(r10=y)
+OUTPUT r10
+DO reveal(P1(g64_1), P2(g64_2)) GET(r11=y)
+OUTPUT r11
+DO reveal(P1(g70_1), P2(g70_2)) GET(r12=y)
+OUTPUT r12
+DO reveal(P1(g76_1), P2(g76_2)) GET(r13=y)
+OUTPUT r13
+DO reveal(P1(g82_1), P2(g82_2)) GET(r14=y)
+OUTPUT r14
+DO reveal(P1(g88_1), P2(g88_2)) GET(r15=y)
+OUTPUT r15
+DO reveal(P1(g94_1), P2(g94_2)) GET(r16=y)
+OUTPUT r16
+DO reveal(P1(g100_1), P2(g100_2)) GET(r17=y)
+OUTPUT r17
+DO reveal(P1(g106_1), P2(g106_2)) GET(r18=y)
+OUTPUT r18
+DO reveal(P1(g112_1), P2(g112_2)) GET(r19=y)
+OUTPUT r19
+DO reveal(P1(g118_1), P2(g118_2)) GET(r20=y)
+OUTPUT r20
+DO reveal(P1(g124_1), P2(g124_2)) GET(r21=y)
+OUTPUT r21
+DO reveal(P1(g130_1), P2(g130_2)) GET(r22=y)
+OUTPUT r22
+DO reveal(P1(g136_1), P2(g136_2)) GET(r23=y)
+OUTPUT r23
+DO reveal(P1(g142_1), P2(g142_2)) GET(r24=y)
+OUTPUT r24
+DO reveal(P1(g148_1), P2(g148_2)) GET(r25=y)
+OUTPUT r25
+DO reveal(P1(g154_1), P2(g154_2)) GET(r26=y)
+OUTPUT r26
+DO reveal(P1(g160_1), P2(g160_2)) GET(r27=y)
+OUTPUT r27
+DO reveal(P1(g166_1), P2(g166_2)) GET(r28=y)
+OUTPUT r28
+DO reveal(P1(g172_1), P2(g172_2)) GET(r29=y)
+OUTPUT r29
+DO reveal(P1(g178_1), P2(g178_2)) GET(r30=y)
+OUTPUT r30
+DO reveal(P1(g184_1), P2(g184_2)) GET(r31=y)
+OUTPUT r31
