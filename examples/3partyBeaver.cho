@@ -1,24 +1,27 @@
+-- To run with secret values:
+-- cabal run haskell-semantics examples/3partyBeaver.cho 1 1 0 1 0 0 0 0 0 1 0 0 1 0 0 0 1 1
+
 -- Triple #1
-c_t1_a = SECRET @C 1 -- a = 0
-h1_t1_a = SECRET @H1 1
-h2_t1_a = SECRET @H2 0
-c_t1_b = SECRET @C 1 -- b = 1
-h1_t1_b = SECRET @H1 0
-h2_t1_b = SECRET @H2 0
-c_t1_c = SECRET @C 0 -- c = 0
-h1_t1_c = SECRET @H1 0
-h2_t1_c = SECRET @H2 0
+c_t1_a = SECRET @C --1 -- a = 0
+h1_t1_a = SECRET @H1 --1
+h2_t1_a = SECRET @H2 --0
+c_t1_b = SECRET @C --1 -- b = 1
+h1_t1_b = SECRET @H1 --0
+h2_t1_b = SECRET @H2 --0
+c_t1_c = SECRET @C --0 -- c = 0
+h1_t1_c = SECRET @H1 --0
+h2_t1_c = SECRET @H2 --0
 
 -- Triple #2
-c_t2_a = SECRET @C 1 -- a = 1
-h1_t2_a = SECRET @H1 0
-h2_t2_a = SECRET @H2 0
-c_t2_b = SECRET @C 1 -- b = 1
-h1_t2_b = SECRET @H1 0
-h2_t2_b = SECRET @H2 0
-c_t2_c = SECRET @C 0 -- c = 1
-h1_t2_c = SECRET @H1 1
-h2_t2_c = SECRET @H2 1
+c_t2_a = SECRET @C --1 -- a = 1
+h1_t2_a = SECRET @H1 --0
+h2_t2_a = SECRET @H2 --0
+c_t2_b = SECRET @C --1 -- b = 1
+h1_t2_b = SECRET @H1 --0
+h2_t2_b = SECRET @H2 --0
+c_t2_c = SECRET @C --0 -- c = 1
+h1_t2_c = SECRET @H1 --1
+h2_t2_c = SECRET @H2 --1
 
 -- Read Secrets
 c_in = SECRET @C
