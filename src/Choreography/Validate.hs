@@ -4,25 +4,36 @@ where
 import Control.Arrow (ArrowChoice(left))
 import Control.Monad (when)
 import Data.Functor.Identity (Identity(..))
-import Data.Map.Strict ((!?), insertWith, Map, insert, fromList)
-import Polysemy (Members, run, Sem)
-import Polysemy.Error (Error, runError, throw)
+import Data.List (intercalate)
+import Data.Map.Strict ((!?), insertWith, Map, insert, fromList, toList)
+import Polysemy (Members, run, Sem, reinterpretH)
+import Polysemy.Error (Error (Throw, Catch), runError, throw)
 import Polysemy.State (get, gets, put, runState, State)
 
 import Choreography.AbstractSyntaxTree
 import Choreography.Parser (Sourced)
 import Choreography.Party hiding (insert)
-import Utils (pretty)
+import Utils (Pretty, pretty)
 
 
 validate :: Map Variable PartySet -> Program Sourced -> Either String (Program Located)
-validate context = left pretty . (snd <$>) . validate' context
+validate context = left collapseError . snd . validate' context
 
-validate' :: Map Variable PartySet -> Program Sourced -> Either (Sourced String) (Map Variable PartySet, Program Located)
-validate' context = cullState . run . runError . runState mempty{variables=context} . traverse validateStatement
-  where cullState (Left l) = Left l
-        cullState (Right (ValidationState{variables}, p)) = Right (variables, p)
+validate' :: Map Variable PartySet -> Program Sourced -> (Map Variable PartySet, Either (ValidationState, Sourced String) (Program Located))
+validate' context = cullState . run . runState mempty{variables=context} . runError . addStateToError . traverse validateStatement
+  where cullState (ValidationState{variables}, p) = (variables, p)
 
+addStateToError :: forall s e a r.
+                   (Members '[State s] r) =>
+                   Sem (Error e ': r) a -> Sem (Error (s, e) ': r) a
+addStateToError = reinterpretH (\case
+    Throw e -> do st <- get
+                  throw (st, e)
+    Catch _ _ -> error "Look that's just not how we're using it, sorry."
+  )
+
+collapseError :: (ValidationState, Sourced String) -> String
+collapseError (vs, ss) = unlines [pretty ss, pretty vs]
 validateStatement :: forall r.
                      (Members '[Error (Sourced String), State ValidationState] r) =>
                      Sourced (Statement Sourced) -> Sem r (Located (Statement Located ))
@@ -44,11 +55,11 @@ validateStatement (sourcePos, stmnt) = case stmnt of
                                                locateLine (ps1 `union` ps2) $ Oblivious (locate ps2 fvar) (locate ps2 fps) body
   Output fvar -> do ps <- lookupVar fvar
                     locateLine ps $ Output (locate ps fvar)
-  Declaration ffName pargs body -> do let lfName@(_, fn) = locate top ffName
+  Declaration ffName pargs body -> do let lfName@(loc, fn) = locate top ffName
                                       let locateParg (fp@(_, p), vs) = (locate (singleton p) fp, locate (singleton p) <$> vs)
                                       let pargs' = locateParg <$> pargs
                                       let asKVP ((_, p), vs) = [(v, singleton p) | (_, v) <- vs]
-                                      (vars, body') <- either throw return $ validate' (fromList $ concat $ asKVP <$> pargs') body
+                                      (vars, body') <- sequence $ either (throw . (source loc,) . collapseError) return <$> validate' (fromList $ concat $ asKVP <$> pargs') body
                                       st@ValidationState{funcArgs, funcReturns} <- get
                                       put st{funcArgs = insert fn [(p, length vs) | ((_, p), vs) <- pargs'] funcArgs,
                                              funcReturns = insert fn vars funcReturns}
@@ -88,6 +99,11 @@ instance Semigroup ValidationState where
   ValidationState v1 a1 r1 <> ValidationState v2 a2 r2 = ValidationState (v1 <> v2) (a1 <> a2) (r1 <> r2)
 instance Monoid ValidationState where
   mempty = ValidationState mempty mempty mempty
+instance Pretty ValidationState where
+  pretty ValidationState{variables, funcArgs, funcReturns} = unlines
+    $ ( (\(var, ps) -> "  " ++ pretty var ++ " @ " ++ pretty ps)  <$> toList variables )
+    <> ( (\(fName, pargs) -> "  " ++ pretty fName ++ "(" ++ intercalate ", " [pretty p ++ " takes " ++ show n | (p, n) <- pargs] ++ ")") <$> toList funcArgs )
+    <> ( (\(fName, namespace) -> "  " ++ pretty fName ++ " -> (" ++ intercalate ", " [pretty v ++ "@" ++ pretty ps | (v, ps) <- toList namespace] ++ ")") <$> toList funcReturns )
 
 bindToParties :: forall r.
                  (Members '[State ValidationState] r) =>

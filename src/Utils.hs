@@ -27,7 +27,7 @@ instance Pretty Bool where
                (n, 1) -> show n
                (n, d) -> show n <> "/" <> show d-}
 instance Pretty SourcePos where
-  pretty = show
+  pretty sp = "(L" ++ show (sourceLine sp) ++ ";C" ++ show (sourceColumn sp) ++ ")"
 
 prettyPrint :: (Pretty a) => a -> IO ()
 prettyPrint = putStrLn . pretty
