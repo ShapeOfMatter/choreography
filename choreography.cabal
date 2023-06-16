@@ -28,15 +28,20 @@ extra-source-files:
 common basic-config
     default-language: Haskell2010
     build-depends:    base ^>=4.14.3.0
+                     ,bytestring
                      ,Cabal ^>= 3.6
+                     ,cassava ^>= 0.5.0.0
                      ,containers ^>= 0.6
                      ,deepseq >=1.1 && <1.5
                      ,distributive ^>= 0.6.2
                      ,parsec >= 3.1.0
                      ,polysemy ^>= 1.9
+                     ,polysemy-zoo ^>= 0.8.0.0
                      ,process >=1.1.0.2 && <1.7
                      ,QuickCheck ^>= 2.14
                      ,template-haskell >= 2.16.0.0
+                     ,tuple == 0.3.0.2
+                     ,vector ^>= 0.13.0.0
     ghc-options:
       -Wall
       -fprint-potential-instances
@@ -79,23 +84,24 @@ executable haskell-semantics
       -main-is HsSemantics
     hs-source-dirs:   app
 
-executable python-semantics
-    import: lib-dependent
-    main-is:          PySemantics.hs
-    ghc-options:
-      -main-is PySemantics
-    hs-source-dirs:   app
+--executable python-semantics
+--    import: lib-dependent
+--    main-is:          PySemantics.hs
+--    ghc-options:
+--      -main-is PySemantics
+--    hs-source-dirs:   app
 
 library
     import: basic-config
     exposed-modules:
       Choreography
       Choreography.AbstractSyntaxTree
+      Choreography.DecisionTree
       --Choreography.EasySyntaxTree
       Choreography.Metadata
       Choreography.Parser
       Choreography.Party
-      Choreography.Python
+      --Choreography.Python
       Choreography.Semantics
       Choreography.Validate
       Distribution.TestSuite.QuickCheck
@@ -110,8 +116,8 @@ Test-Suite languageTests
     test-module:      Tests
     hs-source-dirs:   tests
 
-Test-Suite pythonTests
-    import: lib-dependent
-    type:             detailed-0.9
-    test-module:      TPython
-    hs-source-dirs:   tests
+--Test-Suite pythonTests
+--    import: lib-dependent
+--    type:             detailed-0.9
+--    test-module:      TPython
+--    hs-source-dirs:   tests
