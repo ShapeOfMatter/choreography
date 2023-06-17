@@ -84,6 +84,13 @@ executable haskell-semantics
       -main-is HsSemantics
     hs-source-dirs:   app
 
+executable d-tree-data
+    import: lib-dependent
+    main-is:          DTreeData.hs
+    ghc-options:
+      -main-is DTreeData
+    hs-source-dirs:   app
+
 --executable python-semantics
 --    import: lib-dependent
 --    main-is:          PySemantics.hs

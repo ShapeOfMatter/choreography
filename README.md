@@ -19,19 +19,12 @@ Next you can run a bigger test:
 $>  cabal test
 ```
 
-This will run the two test suites.
-This will take a while, almost all of which is the one test _"Two party three-arg AND in GMW (python)"_,
-which spawns at least a hundred child processes running python.
-Included in this is a healthcheck for the python environment;
-cabal shells _should_ inherit the `$PATH` _etc_ of their parent,
-so if you have a venv environment active with numpy and scikit-learn, you _should_ be ok.
+This will run the ~~two~~ test suite~~s~~.
 One test in the suite of "core" semantics is currently failing, and probably will be until we revisit encryption.
 
-Two executables will be built: `haskell-semantics` and `python-semantics`.
-The python stack is currently a bodge; while the test cases are passing
-I was pretty fast-and-loose getting it to compile and we shouldn't trust it until I've revisited it.
+Two executables will be built: `haskell-semantics` and `d-tree-data`.
 
-Each executable will run a .cho file using the specified semantics.
+`haskell-semantics` will run a .cho file using the specified semantics.
 Optional trailing `1` or `0` arguments will be used as secret inputs, which are otherwise all set to `1`.
 
 ```bash
@@ -49,7 +42,19 @@ Views:  [(Party {party = "C"},[(Variable {variable = "c_s1"},False),(Variable {v
 Outputs:  [(Party {party = "C"},[(Variable {variable = "y"},True)]),(Party {party = "H1"},[(Variable {variable = "y"},True)]),(Party {party = "H2"},[(Variable {variable = "y"},True)])]
 ```
 
-Under the python semantics, the actual python code that gets used gets written to `.temp.py`, in case you want to inspect it.
+`d-tree-data` uses the same semantics, but runs the program many times with random inputs.
+You may choose to run it with `cabal exec` instead of `cabal run`
+so you can pipe it someplace without the extra stuff `run` prints,
+but _I think_ `exec` skips the "up to date" check, so make sure you run `cabal build` first!
+
+```bash
+## easy, prints to stdout:
+$>  cabal run d-tree-data examples/adder_8.cho 2 2 2
+## takes much longer, saves a ~2MB file:
+$>  cabal exec d-tree-data examples/adder_8.cho 100 100 100 > examples/adder_8.csv
+## crashes on my computer:
+$>  cabal exec d-tree-data examples/adder_8.cho 1000 1000 1000 > examples/adder_8.csv
+```
 
 ## Notes
 
@@ -79,5 +84,4 @@ Under the python semantics, the actual python code that gets used gets written t
 - [x] Gathers views during evaluation.
 - [x] Gathers output for each party.
 - [x] Typechecking yields dimensions of input (and output and views)
-  - This is cludgy; it's done in the python semantics, which is a dumb place to keep it.
 - [ ] Typechecking yields party list.
