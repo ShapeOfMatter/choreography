@@ -1,10 +1,13 @@
+-- To run with secret values:
+-- cabal run haskell-semantics examples/2partyBeaver.cho 1 1 1 0 0 0
+
 -- Triple #1
-c_t1_a = SECRET @C 1 -- a = 0
-h_t1_a = SECRET @H 1
-c_t1_b = SECRET @C 1 -- b = 1
-h_t1_b = SECRET @H 0
-c_t1_c = SECRET @C 0 -- c = 0
-h_t1_c = SECRET @H 0
+c_t1_a = SECRET @C --1 -- a = 0
+h_t1_a = SECRET @H --1
+c_t1_b = SECRET @C --1 -- b = 1
+h_t1_b = SECRET @H --0
+c_t1_c = SECRET @C --0 -- c = 0
+h_t1_c = SECRET @H --0
 
 -- Read Secrets
 c_in = SECRET @C

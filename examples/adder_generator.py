@@ -1,4 +1,4 @@
-BITS = 32
+BITS = 8
 f = open(f"adder_{BITS}.cho", "w")
 
 
@@ -73,7 +73,6 @@ MACRO reveal(P1(x1), P2(x2)) AS
   SEND x1 TO P2
   SEND x2 TO P1
   y = x1 + x2
-  OUTPUT y
 ENDMACRO
 """
 emit(header)
@@ -104,7 +103,9 @@ outs = gen_adder(xs, ys)
 
 emit()
 emit('-- Reveal output')
-for o in outs:
-    emit(f'DO reveal(P1({o}_1), P2({o}_2)) GET()')
+rs = [f'r{i}' for i in range(BITS)]
+for o, r in zip(outs, rs):
+    emit(f'DO reveal(P1({o}_1), P2({o}_2)) GET({r}=y)')
+    emit(f'OUTPUT {r}')
 
 f.close()
