@@ -1,3 +1,4 @@
+from argparse import (ArgumentParser, FileType)
 import numpy as np
 import pandas as pd
 from sklearn import tree
@@ -5,9 +6,21 @@ from sklearn.multioutput import ClassifierChain
 from scipy.stats import ttest_ind
 from joblib import Parallel, delayed
 
-NUM_ITERS = 2
+argp = ArgumentParser(description="Run the decision tree test on a csv of data.")
+argp.add_argument("file", type=FileType('r', 1, encoding='utf_8', errors='strict'))
+argp.add_argument("iterations", type=int)
+argp.add_argument("trainingN", type=int)
+argp.add_argument("testingN", type=int)
+args = argp.parse_args()
 
-df = pd.read_csv('miniFunc.csv')
+NUM_ITERS = args.iterations
+NUM_TRAIN = args.trainingN
+PER_ITER = NUM_TRAIN + args.testingN
+
+df = pd.read_csv(args.file)
+
+if len(df) != NUM_ITERS * PER_ITER:
+    print(f"Using {PER_ITER} rows for {NUM_ITERS} iterations, but there are {len(df)} rows!")
 
 ideal_cols = []
 view_cols = []
@@ -24,13 +37,12 @@ features2 = df[ideal_cols + view_cols].to_numpy()
 labels = df[honest_cols].to_numpy()
 
 def run_iter(features1, features2, labels):
-    num_train = int(len(features1) * .5)
-    features1_train = features1[num_train:]
-    features1_test = features1[:num_train]
-    features2_train = features2[num_train:]
-    features2_test = features2[:num_train]
-    labels_train = labels[num_train:]
-    labels_test = labels[:num_train]
+    features1_train = features1[:NUM_TRAIN]
+    features1_test = features1[NUM_TRAIN:PER_ITER]
+    features2_train = features2[:NUM_TRAIN]
+    features2_test = features2[NUM_TRAIN:PER_ITER]
+    labels_train = labels[:NUM_TRAIN]
+    labels_test = labels[NUM_TRAIN:PER_ITER]
 
     model1 = ClassifierChain(tree.DecisionTreeClassifier(), order='random')
     model1.fit(features1_train, labels_train)
