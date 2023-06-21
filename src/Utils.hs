@@ -7,6 +7,7 @@ import Data.Functor.Identity (Identity (runIdentity))
 import Data.List (uncons)
 import Data.Map.Strict (adjust, Map)
 import Data.Maybe (fromJust, fromMaybe)
+import Data.Word (Word64)
 import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Quote as THQuote
 import Polysemy (reinterpret, Sem)
@@ -14,6 +15,7 @@ import Polysemy.Fail (Fail, runFail)
 import Polysemy.Input (Input(..))
 import Polysemy.State (get, put, runState)
 import Text.Parsec hiding (try, uncons)
+import Data.Bits (finiteBitSize, testBit)
 
 
 class Pretty a where
@@ -28,6 +30,8 @@ instance Pretty Bool where
                (n, d) -> show n <> "/" <> show d-}
 instance Pretty SourcePos where
   pretty sp = "(L" ++ show (sourceLine sp) ++ ";C" ++ show (sourceColumn sp) ++ ")"
+instance Pretty Word64 where
+  pretty w = concat [pretty $ testBit w i | i <- [0 .. finiteBitSize w - 1] ]
 
 prettyPrint :: (Pretty a) => a -> IO ()
 prettyPrint = putStrLn . pretty
