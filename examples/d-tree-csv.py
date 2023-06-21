@@ -50,14 +50,17 @@ def run_iter(features1, features2, labels):
     model2 = ClassifierChain(tree.DecisionTreeClassifier(), order='random')
     model2.fit(features2_train, labels_train)
 
-    a1 = model1.score(features1_test, labels_test)
-    a2 = model2.score(features2_test, labels_test)
+    p1 = model1.predict(features1_test)
+    p2 = model2.predict(features2_test)
+    score1 = np.linalg.norm(p1 - labels_test, ord=1, axis=1).sum() / len(p1)
+    score2 = np.linalg.norm(p2 - labels_test, ord=1, axis=1).sum() / len(p1)
 
-    return (a1, a2)
+    return (score2, score1)
 
-results = Parallel(n_jobs=4)(delayed(run_iter)(f1, f2, l) for f1, f2, l in zip(np.split(features1, NUM_ITERS),
-                                                                               np.split(features2, NUM_ITERS),
-                                                                               np.split(labels, NUM_ITERS)))
+results = Parallel(n_jobs=4)(delayed(run_iter)(f1, f2, l) for f1, f2, l in \
+                             zip(np.array_split(features1, NUM_ITERS),
+                                 np.array_split(features2, NUM_ITERS),
+                                 np.array_split(labels, NUM_ITERS)))
 r = np.array(results)
 print(r)
 
