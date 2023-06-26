@@ -1,10 +1,11 @@
 from argparse import (ArgumentParser, FileType)
+from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
+from scipy.stats import ttest_ind
 from sklearn import tree
 from sklearn.multioutput import ClassifierChain
-from scipy.stats import ttest_ind
-from joblib import Parallel, delayed
+from sys import stderr
 
 argp = ArgumentParser(description="Run the decision tree test on a csv of data.")
 argp.add_argument("file", type=FileType('r', 1, encoding='utf_8', errors='strict'))
@@ -20,7 +21,8 @@ PER_ITER = NUM_TRAIN + args.testingN
 df = pd.read_csv(args.file)
 
 if len(df) != NUM_ITERS * PER_ITER:
-    print(f"Using {PER_ITER} rows for {NUM_ITERS} iterations, but there are {len(df)} rows!")
+    print(f"Using {PER_ITER} rows for {NUM_ITERS} iterations, but there are {len(df)} rows!",
+          file=stderr)
 
 ideal_cols = []
 view_cols = []

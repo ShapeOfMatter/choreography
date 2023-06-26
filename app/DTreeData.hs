@@ -2,6 +2,7 @@ module DTreeData where
 
 import Data.List (uncons)
 import qualified Data.Set as Set
+import Data.Word (Word64)
 import Text.Parsec.String (parseFromFile)
 import System.Environment (getArgs)
 import Text.Read (readMaybe)
@@ -17,5 +18,5 @@ main = do
       program' <- parseFromFile (changeState (const ()) (const mempty) programParser) programFile
       let program = either error id $ either (error . show) id $ validate mempty <$> program'
       let corruption = Parties $ Set.fromList [corrupt, p1]
-      printParallelized iterations trainingN testingN program corruption
+      printParallelized @Word64 iterations trainingN testingN program corruption
     _ -> do putStrLn "Useage: d-tree-data file.cho iterations trainingN testingN"
