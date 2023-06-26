@@ -64,7 +64,8 @@ results = Parallel(n_jobs=4)(delayed(run_iter)(f1, f2, l) for f1, f2, l in \
                                  np.array_split(features2, NUM_ITERS),
                                  np.array_split(labels, NUM_ITERS)))
 r = np.array(results)
-print(r)
-
-print('T-test result:', ttest_ind(r[:,0], r[:,1], alternative='less'))
+# print(r)
+statistics = ttest_ind(r[:,0], r[:,1], alternative='less')
+# print('T-test result:', )
+print(statistics.pvalue)
 
