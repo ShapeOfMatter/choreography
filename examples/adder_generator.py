@@ -1,4 +1,8 @@
-BITS = 8
+import sys
+
+assert len(sys.argv) == 2
+
+BITS = int(sys.argv[1])
 f = open(f"adder_{BITS}.cho", "w")
 
 
