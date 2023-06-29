@@ -33,7 +33,7 @@ instance Pretty Circuit where
 arbitraryCircuitWith :: [NodeName] -> Gen Circuit
 arbitraryCircuitWith names = do size <- getSize
                                 if 1 >= size
-                                  then oneof $ (Constant <$> chooseAny) : [Reference <$> elements names | null names]
+                                  then oneof $ (Constant <$> chooseAny) : [Reference <$> elements names | not $ null names]
                                   else do left <- chooseInt (1, size)
                                           a <- resize left $ arbitraryCircuitWith names
                                           b <- resize (1 `max` (size - left)) $ arbitraryCircuitWith names
@@ -95,7 +95,7 @@ arbitraryCleanAST = outerBuild []
                                           cs <- scale (max 1 . flip (-) s) $ build sigma sizes
                                           return $ c ::: cs
         letIn sigma (s `Cons` sizes) = do values <- scale (min s) $ outerBuild sigma
-                                          let names = ["v" ++ show n | n <- [length sigma .. length sigma + tupleLength values]]
+                                          let names = ["v" ++ show n | n <- [length sigma .. length sigma + tupleLength values - 1]]
                                           body <- scale (max 1 . flip (-) s) $ build (names ++ sigma) sizes
                                           return $ Let names values body
 

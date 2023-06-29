@@ -2,14 +2,17 @@ module TCircuits where
 
 import Data.Maybe (isJust, isNothing)
 import Distribution.TestSuite.QuickCheck
-import Test.QuickCheck (conjoin, counterexample)
+import Test.QuickCheck (conjoin, counterexample, expectFailure)
 
 import Circuit
 import Utils (pretty)
 
 tests :: IO [Test]
-tests = do return [ soundAndComplete
-                  , correctAdder]
+tests = do return [soundAndComplete
+                  ,correctAdder
+                  ,junkIsMostlyJunk
+                  ,validIsAllValid
+                  ]
 
 
 soundAndComplete :: Test
@@ -31,5 +34,17 @@ correctAdder = testProperty "The adder circuits actually work." $ \xs ys ->
       results = basicEvaluations arguments circuit
   in conjoin [ counterexample (show (xs, ys, pretty circuit)) $ validations (xNames ++ yNames) circuit
              , counterexample (show (xs, ys, pretty circuit, results)) $ isJust `all` results
-             , counterexample (show (xs, ys, pretty circuit, results, ans)) $ ans == sum [fromEnum b * (2 ^ i) | (Just b, i :: Int) <- results `zip` [0..]]
+             , counterexample (show (xs, ys, pretty circuit, results, ans)) $
+                 ans == sum [fromEnum b * (2 ^ i) | (Just b, i :: Int) <- results `zip` [0..]]
              ]
+
+junkIsMostlyJunk :: Test
+junkIsMostlyJunk = testProperty "The random generator that yields random Circuits yields mostly invalid jibberish." $
+  expectFailure $ validations [] <$> junkCircuitsAST
+
+validIsAllValid :: Test
+validIsAllValid = testProperty "The random generator that yields valid Circuits yields only valid circuits." $
+  do c <- arbitraryCleanAST
+     return $ counterexample (pretty c) $ validations [] c
+
+
