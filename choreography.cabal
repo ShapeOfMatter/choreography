@@ -40,6 +40,7 @@ common basic-config
                      ,process >=1.1.0.2 && <1.7
                      ,QuickCheck ^>= 2.14
                      ,random ^>= 1.2.1
+                     ,Stream ^>= 0.4.7.2
                      ,template-haskell >= 2.16.0.0
                      ,tuple == 0.3.0.2
                      ,vector ^>= 0.13.0.0
@@ -56,6 +57,7 @@ common basic-config
                        ,ConstraintKinds
                        ,DataKinds
                        ,DeriveFunctor
+                       ,DeriveGeneric
                        ,FlexibleContexts
                        ,FlexibleInstances
                        ,FunctionalDependencies
@@ -114,7 +116,9 @@ library
       --Choreography.Python
       Choreography.Semantics
       Choreography.Validate
+      Circuit
       Distribution.TestSuite.QuickCheck
+      GMW
       Python
       Utils
 
@@ -126,8 +130,8 @@ Test-Suite languageTests
     test-module:      Tests
     hs-source-dirs:   tests
 
---Test-Suite pythonTests
---    import: lib-dependent
---    type:             detailed-0.9
---    test-module:      TPython
---    hs-source-dirs:   tests
+Test-Suite circuitTests
+    import: lib-dependent
+    type:             detailed-0.9
+    test-module:      TCircuits
+    hs-source-dirs:   tests

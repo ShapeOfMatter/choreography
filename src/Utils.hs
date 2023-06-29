@@ -2,6 +2,7 @@ module Utils
 where
 
 import Control.Exception (evaluate, Exception, try)
+import Data.Bits (finiteBitSize, testBit)
 import Data.Either (fromRight)
 import Data.Functor.Identity (Identity (runIdentity))
 import Data.List (uncons)
@@ -15,7 +16,6 @@ import Polysemy.Fail (Fail, runFail)
 import Polysemy.Input (Input(..))
 import Polysemy.State (get, put, runState)
 import Text.Parsec hiding (try, uncons)
-import Data.Bits (finiteBitSize, testBit)
 
 
 class Pretty a where
