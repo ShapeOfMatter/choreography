@@ -36,6 +36,10 @@ for c in df.columns:
 
 features1 = df[ideal_cols].to_numpy()
 features2 = df[ideal_cols + view_cols].to_numpy()
+
+padding = np.random.randint(0, 2, (features1.shape[0], features2.shape[1] - features1.shape[1]))
+features1_padded = np.hstack([features1, padding])
+features1 = features1_padded
 labels = df[honest_cols].to_numpy()
 
 def run_iter(features1, features2, labels):
@@ -57,7 +61,7 @@ def run_iter(features1, features2, labels):
     score1 = np.linalg.norm(p1 - labels_test, ord=1, axis=1).sum() / len(p1)
     score2 = np.linalg.norm(p2 - labels_test, ord=1, axis=1).sum() / len(p1)
 
-    return (score2, score1)
+    return (score1, score2)
 
 results = Parallel(n_jobs=4)(delayed(run_iter)(f1, f2, l) for f1, f2, l in \
                              zip(np.array_split(features1, NUM_ITERS),
@@ -65,7 +69,7 @@ results = Parallel(n_jobs=4)(delayed(run_iter)(f1, f2, l) for f1, f2, l in \
                                  np.array_split(labels, NUM_ITERS)))
 r = np.array(results)
 # print(r)
-statistics = ttest_ind(r[:,0], r[:,1], alternative='less')
+statistics = ttest_ind(r[:,0], r[:,1], alternative='greater')
 # print('T-test result:', )
 print(statistics.pvalue)
 
