@@ -8,16 +8,12 @@ import Data.List (nub)
 import Data.Map.Strict ((!), fromList, singleton, empty)
 import qualified Data.Set as Set
 import Distribution.TestSuite.QuickCheck
-import Test.QuickCheck ((===), Arbitrary (arbitrary), chooseInt, counterexample, Gen, ioProperty, Property, vectorOf)
-import Text.Parsec (runParser)
+import Test.QuickCheck ((===), Arbitrary (arbitrary), chooseInt, counterexample, Gen, ioProperty, Property, vectorOf, whenFail)
+import Text.Parsec (runParser, parse)
 import Text.Parsec.String (parseFromFile)
 
-import Choreography.AbstractSyntaxTree
-import Choreography.Parser
-import Choreography.Party hiding (singleton)
+import Choreography hiding (singleton)
 import qualified Choreography.Party as P
-import Choreography.Semantics
-import Choreography.Validate
 import Utils
 
 
@@ -40,7 +36,9 @@ tests' = [ tautology
          , oneOfFourOT
          , gmwAndGates
          , miniFunc
-         , gmwMacroGates]
+         , gmwMacroGates
+         , renderRoundTrip
+         ]
 
 
 tautology :: Test
@@ -248,3 +246,25 @@ miniFuncIO = do
                                   (Identity honest, fromList [(Variable "na", [nCIn])])]
     let (vc, (observedO, observedV)) = deterministicEvaluation' program inputs tapes
     return $ counterexample (pretty vc ++ pretty observedO ++ pretty observedV ++ pretty outputs ++ pretty views) $ observedO == outputs && observedV == views
+
+renderRoundTrip :: Test
+renderRoundTrip = testProperty "Parsing a render gets you the same program back." $ ioProperty $ renderRoundTripIO "examples/GMW_macros.cho"
+renderRoundTripIO :: String -> IO (Gen Property)
+renderRoundTripIO fileName = do
+  program' <- parseFromFile programParser fileName
+  let program1 = either error id $ either (error . show) id $ validate empty <$> program'
+  let rendered = render program1
+  let program2 = either error id $ either (error . show) id $ validate empty <$> parse programParser "render" rendered
+  return do  -- The Gen Monad!
+    secrets <- vectorOf 3 (arbitrary @Bool)
+    let inputs = Inputs $ fromList $ [Variable "c_in"
+                                     ,Variable "h1_in"
+                                     ,Variable "h2_in"] `zip` secrets
+    tapes <- vectorOf 5 (arbitrary @Bool)
+    let (evalSt1, (observed1, v1)) = deterministicEvaluation' program1 inputs tapes
+    let (evalSt2, (observed2, v2)) = deterministicEvaluation' program2 inputs tapes
+    return $ whenFail do{putStrLn $ unlines [rendered, pretty observed1, pretty v1, pretty evalSt1,
+                                             render program2, pretty observed2, pretty v2, pretty evalSt2]}
+               $ observed1 == observed2 && v1 == v2 && evalSt1 `basicallyEqual` evalSt2
+
+

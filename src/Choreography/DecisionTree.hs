@@ -16,7 +16,8 @@ import Polysemy (Members, runM, Sem)
 import Polysemy.Random (Random, random, runRandomIO)
 import qualified System.Random as R
 
-import Choreography.AbstractSyntaxTree (Proper, Program, Variable (Variable))
+import Choreography.AbstractSyntaxTree (Program, Variable (Variable))
+import Choreography.Functors (Proper)
 import Choreography.Metadata (metadata, ProgramMetaData(..))
 import Choreography.Party (isElementOf, PartySet)
 import Choreography.Semantics (Inputs(..), Outputs(..), Views(..), deterministicEvaluation, Semanticable)

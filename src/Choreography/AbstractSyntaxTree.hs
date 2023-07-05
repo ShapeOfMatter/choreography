@@ -1,7 +1,4 @@
-module Choreography.AbstractSyntaxTree
-where
-
-import Text.Parsec (SourcePos)
+module Choreography.AbstractSyntaxTree where
 
 import Choreography.Party (Party(..), PartySet)
 import Utils (Pretty, pretty, Pretty1)
@@ -38,9 +35,9 @@ notNames = ["¬", "NOT", "!", "~"]
 instance (Pretty1 f, Functor f) => Pretty (Algebra f) where
   pretty (Literal fb) = pretty fb
   pretty (Var fv) = pretty fv
-  pretty (Xor fa1 fa2) = unwords [pretty fa1, head xorNames, pretty fa2]
-  pretty (And fa1 fa2) = unwords [pretty fa1, head andNames, pretty fa2]
-  pretty (Not fa) = unwords [head notNames, pretty fa]
+  pretty (Xor fa1 fa2) = "(" ++ unwords [pretty fa1, head xorNames, pretty fa2] ++ ")"
+  pretty (And fa1 fa2) = "(" ++ unwords [pretty fa1, head andNames, pretty fa2] ++ ")"
+  pretty (Not fa) = "(" ++ unwords [head notNames, pretty fa] ++ ")"
 
 data ObvBody f = ObvBody (f (ObvChoice f)) (f (ObvChoice f)) (f Variable)
 deriving instance (forall a. (Show a) => Show (f a)) => Show (ObvBody f)
@@ -87,8 +84,8 @@ callKeywords :: [String]
 callKeywords = ["DO", "GET"]
 instance (Pretty1 f, Functor f) => Pretty (Statement f) where
   pretty (Compute fv fa) = unwords [pretty fv, bindKeyword, pretty fa]
-  pretty (Secret fv fp) = unwords [pretty fv, bindKeyword, secretKeyword, atKeyword, pretty fp]
-  pretty (Flip fv fp) = unwords [pretty fv, bindKeyword, flipKeyword, atKeyword, pretty fp]
+  pretty (Secret fv fp) = unwords [pretty fv, bindKeyword, secretKeyword, atKeyword <> pretty fp]
+  pretty (Flip fv fp) = unwords [pretty fv, bindKeyword, flipKeyword, atKeyword <> pretty fp]
   pretty (Send fps fv) = unwords [head sendKeywords,
                                   pretty fv,
                                   sendKeywords !! 1,
@@ -123,20 +120,3 @@ gatherSelectionVars (ObvBody fc0 fc1 fv) = concatMap (:[]) fv <> concatMap gBran
   where gBranch (ObvLeaf _) = []
         gBranch (ObvBranch body) = gatherSelectionVars body
 
-
-class Proper f where
-  owners :: f a -> PartySet
-  value :: f a -> a
-instance Proper ((,) PartySet) where
-  owners = fst
-  value = snd
-
-data Location = Location { lowners :: PartySet, source :: SourcePos } deriving (Eq, Ord, Show)
-instance Pretty Location where pretty = show
-type Located = (,) Location
-instance Proper Located where
-  owners = lowners . fst
-  value = snd
-
-data Improper = Improper { iowners :: Maybe PartySet, isource :: SourcePos } deriving (Eq, Ord, Show)
-type ILocated = (,) Improper

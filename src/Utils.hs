@@ -46,6 +46,8 @@ instance Pretty1 [] where
   prettyf = unlines
 instance Pretty1 Maybe where
   prettyf = fromMaybe "⎵"
+instance Pretty1 (Either String) where
+ prettyf = either ("Left" ++) ("Right" ++)
 instance {-# OVERLAPPABLE #-} (Pretty1 f, Functor f, Pretty a) => Pretty (f a) where
   pretty = prettyf . (pretty <$>)
 
@@ -116,3 +118,11 @@ runInputUnsafe is = fmap snd . runState is . reinterpret
         put ss
         pure s
   )
+
+
+
+swapsUnless :: Bool -> forall a. (a, a) -> a
+swapsUnless predicate = if predicate then fst else snd
+swapsIf :: Bool -> forall a. (a, a) -> a
+swapsIf predicate = if predicate then snd else fst
+

@@ -1,7 +1,7 @@
 module Circuit where
 
 import Data.Bifunctor (first)
-import Data.List (findIndex, intercalate)
+import Data.List (findIndex, intercalate, nub)
 import Data.Stream (fromList, Stream(Cons))
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import GHC.Generics (Generic)
@@ -21,13 +21,15 @@ data Circuit where
   deriving (Generic, Show)
 
 prettyParens :: Circuit -> String
-prettyParens (Reference name) = name
+prettyParens (Reference name) = if null name then "⎵" else name
 prettyParens (Constant val) = show $ fromEnum val
 prettyParens c = "(" ++ pretty c ++ ")"
 
 instance Pretty Circuit where
-  pretty (a :&: b) = prettyParens a ++ " ∧ " ++ prettyParens b
-  pretty (a :+: b) = prettyParens a ++ " ⊻ " ++ prettyParens b
+  --pretty (a :&: b) = prettyParens a ++ " ∧ " ++ prettyParens b
+  --pretty (a :+: b) = prettyParens a ++ " ⊻ " ++ prettyParens b
+  pretty (a :&: b) = prettyParens a ++ " * " ++ prettyParens b
+  pretty (a :+: b) = prettyParens a ++ " + " ++ prettyParens b
   pretty r = prettyParens r
 
 arbitraryCircuitWith :: [NodeName] -> Gen Circuit
@@ -82,26 +84,27 @@ junkCircuitsAST = do size <- getSize
                                     body <- scale (max 1 . flip (-) s) $ junk sizes
                                     return $ Let names values body
 
-arbitraryCleanAST :: Gen Circuits
-arbitraryCleanAST = outerBuild []
-  where outerBuild sigma = do size <- getSize
-                              sizes <- fromList <$> infiniteListOf (chooseInt (1, (size `div` 2) + 1))
-                              build sigma sizes
-        build :: [NodeName] -> Stream Int -> Gen Circuits
-        build sigma sizes = do size <- getSize
-                               if 1 >= size then return Nil
-                                            else oneof [tuple sigma sizes, letIn sigma sizes]
-        tuple sigma (s `Cons` sizes) = do c <- scale (min s) $ arbitraryCircuitWith sigma
-                                          cs <- scale (max 1 . flip (-) s) $ build sigma sizes
-                                          return $ c ::: cs
-        letIn sigma (s `Cons` sizes) = do values <- scale (min s) $ outerBuild sigma
-                                          let names = ["v" ++ show n | n <- [length sigma .. length sigma + tupleLength values - 1]]
-                                          body <- scale (max 1 . flip (-) s) $ build (names ++ sigma) sizes
-                                          return $ Let names values body
+arbitraryCleanAST :: [NodeName] -> [NodeName] -> Gen Circuits
+arbitraryCleanAST sigma used = do size <- getSize
+                                  sizes <- fromList <$> infiniteListOf (chooseInt (1, (size `div` 2) + 1))
+                                  snd <$> build sigma used sizes
+  where build :: [NodeName] -> [NodeName] -> Stream Int -> Gen ([NodeName], Circuits)
+        build sigma' used' sizes = do size <- getSize
+                                      if 1 >= size then return (used', Nil)
+                                                   else oneof [tuple sigma' used' sizes, letIn sigma' used' sizes]
+        tuple sigma' used' (s `Cons` sizes) = do c <- scale (min s) $ arbitraryCircuitWith sigma'
+                                                 (u, cs) <- scale (max 1 . flip (-) s) $ build sigma' used' sizes
+                                                 return (u, c ::: cs)
+        letIn sigma' used' (s `Cons` sizes) = do usize <- min s <$> getSize
+                                                 usizes <- fromList <$> infiniteListOf (chooseInt (1, (usize `div` 2) + 1))
+                                                 (uv, values) <- scale (min s) $ build sigma' used' usizes
+                                                 let names = ["v" ++ show n | n <- [length uv .. length uv + tupleLength values - 1]]
+                                                 (ub, body) <- scale (max 1 . flip (-) s) $ build (names ++ sigma') (names ++ uv) sizes
+                                                 return (ub, Let names values body)
 
 instance Arbitrary Circuits where
   shrink = genericShrink
-  arbitrary = oneof [junkCircuitsAST, arbitraryCleanAST]
+  arbitrary = oneof [junkCircuitsAST, arbitraryCleanAST [] []]
 
 
 tupleLength :: Circuits -> Int
@@ -109,19 +112,35 @@ tupleLength Nil = 0
 tupleLength (_ ::: cs) = 1 + tupleLength cs
 tupleLength (Let _ _ body) = tupleLength body
 
-validate :: [NodeName] -> Circuit -> Bool
-validate gamma (Reference name) = name `elem` gamma
-validate _ (Constant _) = True
-validate gamma (a :&: b) = validate gamma a && validate gamma b
-validate gamma (a :+: b) = validate gamma a && validate gamma b
 
-validations :: [NodeName] -> Circuits -> Bool
-validations _ Nil = True
-validations gamma (c ::: cs) = validate gamma c && validations gamma cs
-validations gamma (Let names values body) = ("" /=) `all` names
-                                            && length names == tupleLength values
-                                            && validations gamma values
-                                            && validations (names ++ gamma) body
+freeVars :: Circuits -> [NodeName]
+freeVars = nub . freeVars' []
+
+freeVars' :: [NodeName] -> Circuits -> [NodeName]
+freeVars' _ Nil = []
+freeVars' gamma (c ::: cs) = freeVarsC gamma c <> freeVars' gamma cs
+freeVars' gamma (Let names values body) = freeVars' gamma values <> freeVars' (names ++ gamma) body
+
+freeVarsC :: [NodeName] -> Circuit -> [NodeName]
+freeVarsC gamma (Reference name) | name `elem` gamma = []
+                                 | otherwise = [name]
+freeVarsC _ (Constant _) = []
+freeVarsC gamma (a :&: b) = freeVarsC gamma a <> freeVarsC gamma b
+freeVarsC gamma (a :+: b) = freeVarsC gamma a <> freeVarsC gamma b
+
+validate :: [NodeName] -> Circuit -> Bool
+validate = (null .) <$> freeVarsC
+
+validations :: [NodeName] -> [NodeName] -> Circuits -> Bool
+validations _ _ Nil = True
+validations gamma used (c ::: cs) = validate gamma c && validations gamma used cs
+validations gamma used (Let names values body) = let used' = names ++ used
+                                                 in ("" /=) `all` names
+                                                    && not ((('_' ==) . head) `any` names)
+                                                    && not ((`elem` used) `any` names)
+                                                    && length names == tupleLength values
+                                                    && validations gamma used' values
+                                                    && validations (names ++ gamma) used' body
 
 basicEvaluation :: [(NodeName, Bool)] -> Circuit -> Maybe Bool
 basicEvaluation sigma (Reference name) = name `lookup` sigma
@@ -130,34 +149,41 @@ basicEvaluation sigma (a :&: b) = (&&) <$> basicEvaluation sigma a <*> basicEval
 basicEvaluation sigma (a :+: b) = (/=) <$> basicEvaluation sigma a <*> basicEvaluation sigma b
 
 basicEvaluations :: [(NodeName, Bool)] -> Circuits -> [Maybe Bool]
-basicEvaluations _ Nil = []
-basicEvaluations sigma (c ::: cs) = basicEvaluation sigma c : basicEvaluations sigma cs
-basicEvaluations sigma (Let names values body) = let valuations = basicEvaluations sigma values
-                                                     maybeBindings = names `zip` valuations
-                                                     bindings = sequenceA `mapMaybe` maybeBindings
-                                                 in if length valuations == length names && isJust `all` valuations
-                                                      then basicEvaluations (bindings ++ sigma) body
-                                                      else [Nothing]
+basicEvaluations = basicEvaluations' []
+
+basicEvaluations' :: [NodeName] -> [(NodeName, Bool)] -> Circuits -> [Maybe Bool]
+basicEvaluations' _ _ Nil = []
+basicEvaluations' forbidden sigma (c ::: cs) = basicEvaluation sigma c : basicEvaluations' forbidden sigma cs
+basicEvaluations' forbidden sigma (Let names values body) = let forbidden' = names ++ forbidden
+                                                                valuations = basicEvaluations' forbidden' sigma values
+                                                                maybeBindings = names `zip` valuations
+                                                                bindings = sequenceA `mapMaybe` maybeBindings
+                                                            in if length valuations == length names
+                                                                  && isJust `all` valuations
+                                                                  && not ((`elem` forbidden) `any` names)
+                                                                 then basicEvaluations' forbidden' (bindings ++ sigma) body
+                                                                 else [Nothing]
 
 
 
 halfAdder :: Circuit -> Circuit -> Circuits
 halfAdder a b = (a :+: b) ::: (a :&: b) ::: Nil
 
-fullAdder :: Circuit -> Circuit -> Circuit -> Circuits
-fullAdder a b carry = Let [mainSum, mainCarry] (halfAdder a b) (
+fullAdder :: String ->  Circuit -> Circuit -> Circuit -> Circuits
+fullAdder unique a b carry = Let [mainSum, mainCarry] (halfAdder a b) (
     Let [carrySum, carryCarry] (halfAdder (Reference mainSum) carry)
     $ Reference carrySum ::: (Reference mainCarry :+: Reference carryCarry) ::: Nil
   )
-  where mainSum = "mainSum"; mainCarry = "mainCarry"; carrySum = "carrySum"; carryCarry = "carryCarry"
+  where mainSum = "mainSum" ++ unique; mainCarry = "mainCarry" ++ unique; carrySum = "carrySum" ++ unique; carryCarry = "carryCarry" ++ unique
 
 adder :: [(NodeName, NodeName)] -> Circuits
 adder = adder' Nothing . (Reference <$$>) . (first Reference <$>)
   where adder' :: Maybe Circuit -> [(Circuit, Circuit)] -> Circuits
         adder' Nothing [] = Nil
         adder' (Just c) [] = c ::: Nil
-        adder' mc ((a, b):ins) = Let [lsb, carry] (bitAdder a b mc) $ Reference lsb ::: adder' (Just $ Reference carry) ins
-        bitAdder a b Nothing = halfAdder a b
-        bitAdder a b (Just c) = fullAdder a b c
-        lsb = "lstSigBit"; carry = "carry"
+        adder' mc ((a, b):ins) = Let [lsb ins, carry ins] (bitAdder ins a b mc) $ Reference (lsb ins) ::: adder' (Just $ Reference $ carry ins) ins
+        bitAdder _ a b Nothing = halfAdder a b
+        bitAdder ins a b (Just c) = fullAdder (show $ length ins) a b c
+        lsb ins = "lstSigBit" ++ show (length ins)
+        carry ins = "carry" ++ show (length ins)
 

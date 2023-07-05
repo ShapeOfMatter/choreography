@@ -9,7 +9,7 @@ import Text.Parsec.Expr
 import Text.Parsec.Token
 import Text.Parsec.String (Parser)
 
-import Choreography.AbstractSyntaxTree hiding (Located, Location)
+import Choreography.AbstractSyntaxTree
 import Choreography.Party
 import Utils ((<$$>))
 

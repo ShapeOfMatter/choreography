@@ -5,6 +5,7 @@ import Control.Monad (unless, when)
 import Data.Bits ((.&.), (.|.), complement, FiniteBits, xor, zeroBits)
 import Data.Bifunctor (first, second)
 import Data.Foldable (traverse_)
+import Data.Function (on)
 import Data.Functor.Identity (Identity(..))
 import Data.Map.Strict ((!?), empty, insert, Map, singleton, unionWith, toList, fromList)
 import Data.Maybe (fromMaybe, fromJust)
@@ -15,9 +16,10 @@ import Polysemy.State (get, gets, modify, put, runState, State)
 import Polysemy.Trace (Trace, trace, traceToStdout)
 import Polysemy.Writer (runWriter, tell, Writer)
 
+import Choreography.AbstractSyntaxTree
+import Choreography.Functors (owners, Located, Proper, value)
 import Choreography.Party (Concrete, dealias, dealiass, intersect, isElementOf, Party(..), PartySet(..))
 import qualified Choreography.Party as Pty
-import Choreography.AbstractSyntaxTree
 import Utils ((<$$>), (<$$$>), Pretty, pretty, Pretty1, prettyf, runInputUnsafe)
 
 class NS ns a | ns -> a where
@@ -44,6 +46,9 @@ instance forall f. (Pretty1 f) => Pretty1 (EvalState f) where
     $ ( (\(var, (ps, b)) -> "  " ++ pretty var ++ ": " ++ b ++ " @ " ++ pretty ps)  <$> toList varContext )
     <> ( (\(fName, (args, _)) -> "  " ++ pretty fName ++ prettyArgsList (Identity <$$$> (first Identity <$> args))) <$> toList funcContext )
     <> ( (\(plocal, preal) -> "  " ++ pretty plocal ++ " -> " ++ pretty preal) <$> toList aliases )
+
+basicallyEqual :: (Eq w) => EvalState f w -> EvalState f w -> Bool
+basicallyEqual = (==) `on` \EvalState{varContext, funcContext, aliases} -> (varContext, fst <$> funcContext, aliases)
 
 newtype Inputs w = Inputs { inputsMap :: Map Variable w } deriving (Eq, Monoid, Semigroup, Show)
 instance NS (Inputs w) w where

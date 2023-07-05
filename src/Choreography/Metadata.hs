@@ -10,6 +10,7 @@ import Polysemy.Writer (runWriter, tell, Writer)
 import Polysemy.State (gets, modify, evalState, State)
 
 import Choreography.AbstractSyntaxTree
+import Choreography.Functors (owners, Proper, value)
 import Choreography.Party hiding (insert, singleton)
 import Utils (pretty, Pretty1)
 
