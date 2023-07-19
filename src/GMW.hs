@@ -29,7 +29,7 @@ sharesOf :: forall r.
             NodeName -> Sem r (Variable, Variable)
 sharesOf n = do (Party p1, Party p2) <- ask
                 return (mk p1, mk p2)
-  where mk p = Variable $ "_" ++ n ++ "_" ++ (toLower <$> p)
+  where mk p = Variable . (toLower <$>) $ "_" ++ n ++ "_" ++ p
 
 gmw :: (Party, Party) -> Circuits -> [NodeName] -> (Program Identity, [Variable])
 gmw p12@(p1, p2) circuits p1Secrets =
@@ -43,7 +43,7 @@ gmw p12@(p1, p2) circuits p1Secrets =
                   choose2 :: forall a. (a, a) -> a
                   choose2 = swapsIf dontSwap
               let owner = choose1 p12
-              let secVar = Variable secret
+              let secVar = Variable $ toLower <$> secret
               shares <- sharesOf secret
               tell [iii $ Secret (iii secVar) (iii owner),
                     iii $ Call (iii $ FuncName "secret_share")

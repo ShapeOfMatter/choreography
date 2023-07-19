@@ -10,10 +10,9 @@ import Text.Parsec.Token
 import Text.Parsec.String (Parser)
 
 import Choreography.AbstractSyntaxTree
+import Choreography.Functors (Sourced)
 import Choreography.Party
 import Utils ((<$$>))
-
-type Sourced = (,) SourcePos
 
 positioned :: Parser a -> Parser (Sourced a)
 positioned p = do source <- getPosition

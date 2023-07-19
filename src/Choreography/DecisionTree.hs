@@ -44,7 +44,7 @@ batchesOf iterations = let batchSize = fromIntegral $ finiteBitSize (undefined :
 makeData :: forall w f r.
             (Members '[Random] r,
              Proper f, Functor f, Traversable f, Pretty1 f,
-             Semanticable w, R.Random w) =>
+             Semanticable w, R.Uniform w) =>
             Int -> Program f -> [(Extraction w, FieldName)] -> Sem r [Map FieldName w]
 makeData batches p h = V.toList <$> flatten <$$> vectorSemantics batches p
     where flatten iov = fromList [(name, f iov) | (f, name) <- h]
@@ -81,7 +81,7 @@ asHeader = header . (toField . snd <$>)
 vectorSemantics :: forall w f r.
                    (Members '[Random] r,
                     Proper f, Functor f, Traversable f, Pretty1 f,
-                    Semanticable w, R.Random w) =>
+                    Semanticable w, R.Uniform w) =>
                    Int -> Program f -> Sem r (Vector (Inputs w, Outputs w, Views w))
 vectorSemantics n p = V.replicateM n trial
   where ProgramMetaData {inputVars, tapeVars} = metadata p
@@ -100,7 +100,7 @@ writeCSV file h records = do let bs = encodeByName h $ concat (expand <$> record
 
 printParallelized :: forall w f.
                      (Proper f, Functor f, Traversable f, Pretty1 f,
-                      Semanticable w, R.Random w) =>
+                      Semanticable w, R.Uniform w) =>
                      Int -> Int -> Int -> Program f -> PartySet -> IO ()
 printParallelized iterations trainingN testingN p corruption = do
     let fields = structureFields p corruption

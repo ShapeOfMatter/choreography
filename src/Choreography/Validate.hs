@@ -3,20 +3,18 @@ where
 
 import Control.Arrow (ArrowChoice(left))
 import Control.Monad (when)
-import Data.Bifunctor (first)
 import Data.Functor.Identity (Identity(..))
 import Data.List (intercalate)
 import Data.Map.Strict ((!?), insertWith, Map, insert, fromList, toList)
 import Polysemy (Members, run, Sem, reinterpretH)
 import Polysemy.Error (Error (Throw, Catch), runError, throw)
 import Polysemy.State (get, gets, put, runState, State)
-import qualified Text.Parsec.Pos as Pos
 
 import Choreography.AbstractSyntaxTree
-import Choreography.Functors (antimap, Located, Location(..))
-import Choreography.Parser (Sourced)
+import Choreography.Functors (Located, Location(..), Sourced)
+import Choreography.Parser ()
 import Choreography.Party hiding (insert)
-import Utils ((<$$>), Pretty, pretty)
+import Utils (Pretty, pretty)
 
 
 validate :: Map Variable PartySet -> Program Sourced -> Either String (Program Located)
@@ -37,6 +35,7 @@ addStateToError = reinterpretH (\case
 
 collapseError :: (ValidationState, Sourced String) -> String
 collapseError (vs, ss) = unlines [pretty ss, pretty vs]
+
 validateStatement :: forall r.
                      (Members '[Error (Sourced String), State ValidationState] r) =>
                      Sourced (Statement Sourced) -> Sem r (Located (Statement Located ))
@@ -166,16 +165,4 @@ validateAlg (src, algebra) = case algebra of
   Not falg -> do (ps, alg@(location, _)) <- validateAlg falg
                  return (ps, (location{source=src}, Not alg))
   where ps1 `inter` ps2 = maybe (throw (src, "Nobody has all the pieces to compute " ++ pretty algebra ++ ".")) return $ ps1 `intersect` ps2
-
-
-fakePos :: Pos.Line -> Program Identity -> (Pos.Line, Program Sourced)
-fakePos l [] = (l, [])
-fakePos l (Identity stmnt : ps) = case stmnt of
-  Declaration fName pargs body -> let (l', body') = fakePos (l + 1) body
-                                      decl = (pos, Declaration (atPos fName) ((atPos <$$>) . first atPos <$> pargs) body')
-                                  in (decl :) <$> fakePos l' ps
-  _ -> ((pos, antimap atPos stmnt) :) <$> fakePos (l + 1) ps
-  where pos = Pos.newPos "__AST" l (-1)
-        atPos :: Identity a -> Sourced a
-        atPos = (pos,) . runIdentity
 

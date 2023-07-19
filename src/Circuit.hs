@@ -1,13 +1,12 @@
 module Circuit where
 
-import Data.Bifunctor (first)
 import Data.List (findIndex, intercalate, nub)
 import Data.Stream (fromList, Stream(Cons))
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import GHC.Generics (Generic)
 import Test.QuickCheck (Arbitrary, arbitrary, chooseAny, chooseInt, elements, Gen, genericShrink, getSize, resize, scale, sized, shrink, resize, vectorOf, oneof, infiniteListOf, listOf)
 
-import Utils ((<$$>), Pretty, pretty)
+import Utils (Pretty, pretty)
 
 type NodeName = String
 
@@ -177,13 +176,14 @@ fullAdder unique a b carry = Let [mainSum, mainCarry] (halfAdder a b) (
   where mainSum = "mainSum" ++ unique; mainCarry = "mainCarry" ++ unique; carrySum = "carrySum" ++ unique; carryCarry = "carryCarry" ++ unique
 
 adder :: [(NodeName, NodeName)] -> Circuits
-adder = adder' Nothing . (Reference <$$>) . (first Reference <$>)
-  where adder' :: Maybe Circuit -> [(Circuit, Circuit)] -> Circuits
-        adder' Nothing [] = Nil
+adder = adder' Nothing
+  where adder' Nothing [] = Nil
         adder' (Just c) [] = c ::: Nil
-        adder' mc ((a, b):ins) = Let [lsb ins, carry ins] (bitAdder ins a b mc) $ Reference (lsb ins) ::: adder' (Just $ Reference $ carry ins) ins
-        bitAdder _ a b Nothing = halfAdder a b
-        bitAdder ins a b (Just c) = fullAdder (show $ length ins) a b c
-        lsb ins = "lstSigBit" ++ show (length ins)
-        carry ins = "carry" ++ show (length ins)
+        adder' mc ((a, b):ins) = Let [lsb a b, carry a b]
+                                     (bitAdder a b mc)
+                                     $ Reference (lsb a b) ::: adder' (Just $ Reference $ carry a b) ins
+        bitAdder a b Nothing = halfAdder (Reference a) (Reference b)
+        bitAdder a b (Just c) = fullAdder ("_" ++ a ++ "_" ++ b) (Reference a) (Reference b) c
+        lsb a b = "lstSigBit_" ++ a ++ "_" ++ b
+        carry a b = "carry_" ++ a ++ "_" ++ b
 

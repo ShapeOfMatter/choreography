@@ -22,7 +22,6 @@ import Test.QuickCheck ((.&&.),
                         scale,
                         sublistOf,
                         Testable, whenFail)
-import Test.QuickCheck.Monadic (assert, monadic, PropertyM, run)
 
 import Circuit
 import Choreography (corrupt, deterministicEvaluation, fakePos, Inputs(..), honest, Outputs(..), Variable(..))

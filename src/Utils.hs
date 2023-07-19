@@ -11,7 +11,8 @@ import Data.Maybe (fromJust, fromMaybe)
 import Data.Word (Word64)
 import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Quote as THQuote
-import Polysemy (reinterpret, Sem)
+import Polysemy (interpretH, reinterpret, Sem)
+import Polysemy.Error (Error(Catch, Throw))
 import Polysemy.Fail (Fail, runFail)
 import Polysemy.Input (Input(..))
 import Polysemy.State (get, put, runState)
@@ -126,3 +127,29 @@ swapsUnless predicate = if predicate then fst else snd
 swapsIf :: Bool -> forall a. (a, a) -> a
 swapsIf predicate = if predicate then snd else fst
 
+
+
+-- https://wiki.haskell.org/Generic_number_type#squareRoot
+squareRoot :: (Integral a) => a -> a
+squareRoot 0 = 0
+squareRoot 1 = 1
+squareRoot n =
+   let (^!) :: Num a => a -> Int -> a
+       (^!) x e = x^e
+       twopows = iterate (^!2) 2
+       (lowerRoot, lowerN) =
+          last $ takeWhile ((n>=) . snd) $ zip (1:twopows) twopows
+       newtonStep x = div (x + div n x) 2
+       iters = iterate newtonStep (squareRoot (div n lowerN) * lowerRoot)
+       isRoot r  =  r^!2 <= n && n < (r+1)^!2
+   in  head $ dropWhile (not . isRoot) iters
+
+
+
+failOnError :: forall e a r.
+               (Show e) =>
+               Sem (Error e ': r) a -> Sem r a
+failOnError = interpretH (\case
+    Throw e -> error $ show e
+    Catch _ _ -> error "LOL, pretty sure it's too late for that!"
+  )

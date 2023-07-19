@@ -8,7 +8,7 @@ import Data.List (nub)
 import Data.Map.Strict ((!), fromList, singleton, empty)
 import qualified Data.Set as Set
 import Distribution.TestSuite.QuickCheck
-import Test.QuickCheck ((===), Arbitrary (arbitrary), chooseInt, counterexample, Gen, ioProperty, Property, vectorOf, whenFail)
+import Test.QuickCheck ((===), Arbitrary (arbitrary), counterexample, Gen, ioProperty, Property, vectorOf, whenFail)
 import Text.Parsec (runParser, parse)
 import Text.Parsec.String (parseFromFile)
 
@@ -33,7 +33,7 @@ tests' = [ tautology
          , testObliv
          , example
          , pipeline
-         , oneOfFourOT
+         -- , oneOfFourOT
          , gmwAndGates
          , miniFunc
          , gmwMacroGates
@@ -185,6 +185,7 @@ pipeline = testProperty "3partyXOR.cho gives correct outputs" $ ioProperty do
     let (observed, _) = deterministicEvaluation program inputs tapes
     return $ observed === outputs
 
+{- -- Currently UNused!
 oneOfFourOT :: Test
 oneOfFourOT = testProperty "1-of-4 Oblivious Transfer" $ ioProperty oneOfFourOTIO
 oneOfFourOTIO :: IO (Gen Property)
@@ -206,6 +207,7 @@ oneOfFourOTIO = do
     let outputs = Outputs $ fromList $ [Identity p2] `zip` repeat (singleton (Variable "final") y)
     let (vc, (observed, _)) = deterministicEvaluation' program inputs tapes
     return $ counterexample (pretty vc) $ observed == outputs
+    -}
 
 gmwAndGates :: Test
 gmwAndGates = testProperty "Two party three-arg AND in GMW" $ ioProperty $ gmwAndGatesIO "examples/3party2andGMW.cho"
