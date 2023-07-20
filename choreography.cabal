@@ -114,6 +114,7 @@ library
       Choreography.Metadata
       Choreography.Parser
       Choreography.Party
+      Choreography.Random
       Choreography.Render
       Choreography.Semantics
       Choreography.Validate

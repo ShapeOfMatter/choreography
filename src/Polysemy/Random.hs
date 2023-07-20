@@ -27,6 +27,7 @@ module Polysemy.Random
 import           Control.Monad (filterM)
 import           Data.List (genericReplicate, sortOn)
 import           Data.List.NonEmpty as NonEmpty ((!!), NonEmpty((:|)))
+import           GHC.Exts (fromList, IsList (Item), toList)
 import           Numeric.Natural (Natural)
 import           Polysemy
 import           Polysemy.State
@@ -97,25 +98,29 @@ oneOf xs = do i <- randomR (0, length xs - 1)
 ------------------------------------------------------------------------------
 -- | Randomly choose 'n' items from 'xs', without replacement.
 -- If 'n <= length xs', all of 'xs' (permuted) will be returned.
-manyOf :: forall a r.
-          (Member Random r) =>
-          Int -> [a] -> Sem r [a]
-n `manyOf` xs = do take n <$> shuffle xs
+manyOf :: forall l r.
+          (Member Random r,
+           IsList l) =>
+          Int -> l -> Sem r [Item l]
+n `manyOf` xs = do take n <$> shuffle (toList xs)
 
 ------------------------------------------------------------------------------
 -- | Form a subset of 'xs', where each element of 'xs' has a '1-p' chance of being included.
-attrit :: forall a r.
-          (Member Random r) =>
-          Double -> [a] -> Sem r [a]
-p `attrit` xs = filterM (\_ -> bernoulli (1 - p)) xs
+attrit :: forall l r.
+          (Member Random r,
+           IsList l) =>
+          Double -> l -> Sem r [Item l]
+p `attrit` xs = filterM (\_ -> bernoulli (1 - p)) $ toList xs
 
 ------------------------------------------------------------------------------
 -- | A random permutation of 'xs'.
-shuffle :: forall a r.
-           (Member Random r) =>
-           [a] -> Sem r [a]
-shuffle xs = do ns <- sample @Int $ length xs
-                return . fmap snd . sortOn fst $ ns `zip` xs
+shuffle :: forall l r.
+           (Member Random r,
+            IsList l) =>
+           l -> Sem r l
+shuffle xs = do let lxs = toList xs
+                ns <- sample @Int $ length lxs
+                return . fromList . fmap snd . sortOn fst $ ns `zip` lxs
 
 
 ------------------------------------------------------------------------------
@@ -124,14 +129,16 @@ shuffle xs = do ns <- sample @Int $ length xs
 weighted :: forall a r.
             (Member Random r) =>
             NonEmpty (Natural, a) -> Sem r a
-weighted xs = consume xs <$> randomR (0, sum (fst <$> xs) - 1)
+weighted xs = case sum (fst <$> xs) of
+                space | 0 < space -> consume xs <$> randomR (0, space - 1)
+                      | otherwise -> error $ "Attempted to sample from a distribution who's weights can not be normalized: "
+                                             ++ show ((() <$) <$> xs)
 
 ------------------------------------------------------------------------------
 -- | Pick randomly from a non-empty possibly-infinite list, using normalized weight annotations.
 -- The requirement that all weights be 0-1 (inclusive) and that they sum to 1 is not checked!
 distributed :: forall a w r.
-               (Num w
-               ,Ord w
+               (RealFloat w
                ,R.UniformRange w
                ,Member Random r) =>
                NonEmpty (w, a) -> Sem r a

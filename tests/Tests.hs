@@ -15,6 +15,7 @@ import Text.Parsec.String (parseFromFile)
 import Choreography hiding (singleton)
 import qualified Choreography.Party as P
 import Utils
+import Data.Either (isRight)
 
 
 tests :: IO [Test]
@@ -38,6 +39,7 @@ tests' = [ tautology
          , miniFunc
          , gmwMacroGates
          , renderRoundTrip
+         , genIsVaid
          ]
 
 
@@ -269,4 +271,8 @@ renderRoundTripIO fileName = do
                                              render program2, pretty observed2, pretty v2, pretty evalSt2]}
                $ observed1 == observed2 && v1 == v2 && evalSt1 `basicallyEqual` evalSt2
 
+genIsVaid :: Test
+genIsVaid = testProperty "The protocol generator only yields valid protocols." $ do p <- generateProgram
+                                                                                    let v = validate mempty . snd $ fakePos 0 p
+                                                                                    return $ counterexample (pretty p) $ isRight v
 
