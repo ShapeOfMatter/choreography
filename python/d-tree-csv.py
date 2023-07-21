@@ -63,10 +63,16 @@ def run_iter(features1, features2, labels):
 
     return (score1, score2)
 
-results = Parallel(n_jobs=4)(delayed(run_iter)(f1, f2, l) for f1, f2, l in \
-                             zip(np.array_split(features1, NUM_ITERS),
-                                 np.array_split(features2, NUM_ITERS),
-                                 np.array_split(labels, NUM_ITERS)))
+try:
+    results = Parallel(n_jobs=4)(delayed(run_iter)(f1, f2, l)
+                                 for f1, f2, l
+                                 in zip(np.array_split(features1, NUM_ITERS),
+                                        np.array_split(features2, NUM_ITERS),
+                                        np.array_split(labels, NUM_ITERS)))
+except Exception as e:
+    print(df[:10])
+    raise e
+
 r = np.array(results)
 # print(r)
 statistics = ttest_ind(r[:,0], r[:,1], alternative='greater')
