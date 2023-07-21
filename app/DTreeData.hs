@@ -1,22 +1,40 @@
 module DTreeData where
 
-import Data.List (uncons)
+import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import Data.Word (Word64)
+import Options.Applicative ((<**>), argument, auto, help, helper, info, long, metavar, Parser, progDesc, short, strOption, value, execParser)
 import Text.Parsec.String (parseFromFile)
-import System.Environment (getArgs)
-import Text.Read (readMaybe)
 
-import Choreography
+import Choreography hiding (source, value)
 import Utils
+
+data Arguments = Arguments { iterations :: Int
+                           , trainingN :: Int
+                           , testingN :: Int
+                           , source :: Maybe FilePath
+                           }
+
+argParser :: Parser Arguments
+argParser = do
+    iterations <- argument auto (   metavar "ITERATIONS" <> help "How many times the cycle to testing and training a decision tree will repeat.")
+    trainingN <- argument auto (    metavar "TRAINING"   <> help "How many rows of data to train the decision trees on.")
+    testingN <- argument auto (     metavar "TESTING"    <> help "How many rows of data to test the decision trees on.")
+    source <- strOption (           long "file"          <> short 'f' <> metavar "FILENAME"
+                                                         <> help "File to read from instead of stdIn." <> value "")
+    return Arguments{iterations, trainingN, testingN,
+                     source = case source of [] -> Nothing; _ -> Just source}
 
 main :: IO ()
 main = do
-  args <- getArgs
-  case readMaybe @Int <$$$> uncons args of
-    Just (programFile, [Just iterations, Just trainingN, Just testingN]) -> do
-      program' <- parseFromFile (changeState (const ()) (const mempty) programParser) programFile
-      let program = either error id $ either (error . show) id $ validate mempty <$> program'
-      let corruption = Parties $ Set.fromList [corrupt, p1]
-      printParallelized @Word64 iterations trainingN testingN program corruption
-    _ -> do putStrLn "Useage: d-tree-data file.cho iterations trainingN testingN"
+  let corruption = Parties $ Set.fromList [corrupt, p1]
+  Arguments{iterations, trainingN, testingN, source} <- execParser $
+      info (argParser <**> helper) (progDesc $ unlines [
+        "Generate ITERATIONS * (TRAINING + TESTING) rows of trace data for consumption by the d-tree system.",
+        "assumes " ++ pretty corruption ++ " are corrupt."])
+  -- internet suggets easy way of optionally reading from stdin:
+  -- https://unix.stackexchange.com/questions/483573/a-command-wants-file-paths-how-can-i-give-it-stdin-for-the-infile-and-stdout
+  program' <- parseFromFile (changeState (const ()) (const mempty) programParser) $ fromMaybe "/dev/stdin" source
+  let program = either error id $ either (error . show) id $ validate mempty <$> program'
+  printParallelized @Word64 iterations trainingN testingN program corruption
+

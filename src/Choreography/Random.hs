@@ -3,7 +3,7 @@ module Choreography.Random where
 import Control.Monad (when, join)
 import Data.Bool (bool)
 import Data.Functor.Identity (Identity(Identity), runIdentity)
-import Data.List.NonEmpty (NonEmpty((:|)), cons, nonEmpty)
+import Data.List.NonEmpty (NonEmpty((:|)), nonEmpty)
 import Data.Map (keys)
 import qualified Data.Map as Map
 import Data.Maybe (mapMaybe)
@@ -18,11 +18,11 @@ import Polysemy.Writer (runWriter, Writer)
 import qualified Polysemy.Writer as W -- so we don't use the wrong tell by accident.
 import Test.QuickCheck (Gen, getSize, Arbitrary (arbitrary))
 import qualified Text.Parsec.Pos as Pos
-import System.Random (mkStdGen)
+import System.Random (mkStdGen, RandomGen)
 
 import Choreography.AbstractSyntaxTree
 import Choreography.Functors (antimap')
-import Choreography.Party (corrupt, honest, isElementOf, isSubsetOf, Party, singleton, PartySet (Parties), top)
+import Choreography.Party (corrupt, honest, isElementOf, isSubsetOf, Party, singleton, PartySet (Parties))
 import Choreography.Validate (bindToParties, validateAlg, ValidationState (variables))
 import Utils (squareRoot, failOnError)
 
@@ -54,6 +54,9 @@ data ProgramSize = ProgramSize { len :: Int
                                , sendEagerness :: Double
                                , oblivComplexity :: Double
                                }
+
+randomProgram :: (RandomGen q) => ProgramSize -> q -> Program Identity
+randomProgram params q = fst . run . runWriter . evalState mempty . runRandom q . runReader params $ buildProgram
 
 generateProgram :: Gen (Program Identity)
 generateProgram = do size <- getSize
@@ -111,8 +114,12 @@ buildOutputs :: forall r.
                 (ProgramBuilder r) =>
                 Sem r ()
 buildOutputs = do n <- asks outWidth >>= randomR . (1, )
-                  boundVars <- gets $ keys . variables
-                  selected <- n `manyOf` boundVars
+                  allVars <- gets $ toList . variables
+                  let useableVars = [ var
+                                      | (var, Parties ps) <- allVars
+                                      , not (null ps)  -- we filter out TOP, bc that's not implemented. This _should only affect literals.
+                                      ]
+                  selected <- n `manyOf` useableVars
                   sequence_ [ tell $ Output $ iii var
                               | var <- selected
                             ]
@@ -122,7 +129,9 @@ buildCompute :: forall r.
                 Sem r Int
 buildCompute = do allVariables <- gets variables
                   allParties <- asks participants
-                  ps <- oneOf $ top `cons` (singleton <$> allParties) -- TODO: what if there's not just two parties?
+                  -- Because allParties is nonEmpty, the powerset will be nonempty even after we remove the empty set.
+                  -- This could be done other ways, but this has the advantage that it's not biased toward `top` computations.
+                  ps <- oneOf . (Parties <$>) . fromList . toList . S.delete mempty . S.powerSet . fromList . toList $ allParties
                   let vars = keys $ Map.filter (ps `isSubsetOf`) allVariables
                   let buildAlg :: Sem r (Algebra Identity)
                       buildAlg = do size <- asks algWidth
@@ -150,7 +159,7 @@ buildSend :: forall r.
              Sem r Int
 buildSend = do boundVars <- gets $ toList . variables
                allParties <- toList <$> asks participants
-               let options = [ (possibleRecipients, var)
+               let options = [ (fromList possibleRecipients, var)
                                | (var, owners) <- boundVars
                                , let possibleRecipients = [p | p <- allParties , not (p `isElementOf` owners)]
                                , not (null possibleRecipients)
@@ -158,8 +167,9 @@ buildSend = do boundVars <- gets $ toList . variables
                case options of [] -> return 0
                                v : vs -> do (possibleRecipients, var) <- oneOf $ v :| vs
                                             se <- (1 -) <$> asks sendEagerness
-                                            ps <- attrit se possibleRecipients -- if none of them make it, it goes to everyone!
-                                            tell $ Send (iii $ Parties $ fromList ps)  (iii var)
+                                            rHead <- oneOf possibleRecipients -- it has to go to at least one new person.
+                                            rTail <- attrit se allParties
+                                            tell $ Send (iii . Parties . fromList $ rHead : rTail)  (iii var)
                                             return 1
 
 data OblivOption f1 f2 = OblivOption { recipients :: PartySet

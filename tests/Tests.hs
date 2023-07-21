@@ -3,19 +3,22 @@ module Tests (
   tests'
 ) where
 
+import Data.Either (isRight)
 import Data.Functor.Identity (Identity(..))
 import Data.List (nub)
 import Data.Map.Strict ((!), fromList, singleton, empty)
 import qualified Data.Set as Set
 import Distribution.TestSuite.QuickCheck
-import Test.QuickCheck ((===), Arbitrary (arbitrary), counterexample, Gen, ioProperty, Property, vectorOf, whenFail)
+import Polysemy (run)
+import Polysemy.Random (runRandom)
+import Test.QuickCheck ((===), Arbitrary (arbitrary), arbitraryBoundedIntegral, counterexample, Gen, ioProperty, Property, vectorOf)
 import Text.Parsec (runParser, parse)
 import Text.Parsec.String (parseFromFile)
+import System.Random (mkStdGen)
 
 import Choreography hiding (singleton)
 import qualified Choreography.Party as P
 import Utils
-import Data.Either (isRight)
 
 
 tests :: IO [Test]
@@ -252,8 +255,16 @@ miniFuncIO = do
     return $ counterexample (pretty vc ++ pretty observedO ++ pretty observedV ++ pretty outputs ++ pretty views) $ observedO == outputs && observedV == views
 
 renderRoundTrip :: Test
-renderRoundTrip = testProperty "Parsing a render gets you the same program back." $ ioProperty $ renderRoundTripIO "examples/GMW_macros.cho"
-renderRoundTripIO :: String -> IO (Gen Property)
+renderRoundTrip = testProperty "Parsing a render gets you the same program back." $ do
+    p <- generateProgram
+    let str = pretty p
+    let program1 = either error id $ validate mempty . snd $ fakePos 0 p
+    let program2 = either error id $ either (error . show) id $ validate mempty <$> parse programParser "render" str
+    q <- mkStdGen <$> arbitraryBoundedIntegral
+    let vals1 = run . runRandom q $ makeData @Bool 64 program1 $ structureFields program1 $ P.singleton honest <> P.singleton corrupt
+    let vals2 = run . runRandom q $ makeData @Bool 64 program2 $ structureFields program2 $ P.singleton honest <> P.singleton corrupt
+    return $ counterexample (pretty p) $ vals1 == vals2
+{-renderRoundTripIO :: String -> IO (Gen Property)
 renderRoundTripIO fileName = do
   program' <- parseFromFile programParser fileName
   let program1 = either error id $ either (error . show) id $ validate empty <$> program'
@@ -270,6 +281,7 @@ renderRoundTripIO fileName = do
     return $ whenFail do{putStrLn $ unlines [rendered, pretty observed1, pretty v1, pretty evalSt1,
                                              render program2, pretty observed2, pretty v2, pretty evalSt2]}
                $ observed1 == observed2 && v1 == v2 && evalSt1 `basicallyEqual` evalSt2
+               -}
 
 genIsVaid :: Test
 genIsVaid = testProperty "The protocol generator only yields valid protocols." $ do p <- generateProgram
