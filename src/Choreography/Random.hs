@@ -40,7 +40,7 @@ type ProgramBuilder r = Members '[ State ValidationState
 data BodyRatios = BodyRatios { compute :: Natural
                              , send :: Natural
                              , obliv :: Natural
-                             }
+                             } deriving (Show)
 
 data ProgramSize = ProgramSize { len :: Int
                                , algWidth :: Int
@@ -53,7 +53,7 @@ data ProgramSize = ProgramSize { len :: Int
                                , notFrequency :: Double
                                , sendEagerness :: Double
                                , oblivComplexity :: Double
-                               }
+                               } deriving (Show)
 
 randomProgram :: (RandomGen q) => ProgramSize -> q -> Program Identity
 randomProgram params q = fst . run . runWriter . evalState mempty . runRandom q . runReader params $ buildProgram

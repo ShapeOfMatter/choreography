@@ -9,9 +9,7 @@ import Text.Parsec.String (parseFromFile)
 import Choreography hiding (source, value)
 import Utils
 
-data Arguments = Arguments { iterations :: Int
-                           , trainingN :: Int
-                           , testingN :: Int
+data Arguments = Arguments { iters :: IterConfig
                            , source :: Maybe FilePath
                            }
 
@@ -22,13 +20,13 @@ argParser = do
     testingN <- argument auto (     metavar "TESTING"    <> help "How many rows of data to test the decision trees on.")
     source <- strOption (           long "file"          <> short 'f' <> metavar "FILENAME"
                                                          <> help "File to read from instead of stdIn." <> value "")
-    return Arguments{iterations, trainingN, testingN,
+    return Arguments{iters = IterConfig {iterations, trainingN, testingN },
                      source = case source of [] -> Nothing; _ -> Just source}
 
 main :: IO ()
 main = do
   let corruption = Parties $ Set.fromList [corrupt, p1]
-  Arguments{iterations, trainingN, testingN, source} <- execParser $
+  Arguments{iters, source} <- execParser $
       info (argParser <**> helper) (progDesc $ unlines [
         "Generate ITERATIONS * (TRAINING + TESTING) rows of trace data for consumption by the d-tree system.",
         "assumes " ++ pretty corruption ++ " are corrupt."])
@@ -36,5 +34,5 @@ main = do
   -- https://unix.stackexchange.com/questions/483573/a-command-wants-file-paths-how-can-i-give-it-stdin-for-the-infile-and-stdout
   program' <- parseFromFile (changeState (const ()) (const mempty) programParser) $ fromMaybe "/dev/stdin" source
   let program = either error id $ either (error . show) id $ validate mempty <$> program'
-  printParallelized @Word64 iterations trainingN testingN program corruption
+  printParallelized @Word64 iters program corruption
 

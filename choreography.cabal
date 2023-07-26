@@ -106,6 +106,13 @@ executable random-cho
       -main-is RandomCho
     hs-source-dirs:   app
 
+executable meso-search
+    import: lib-dependent
+    main-is:          Search.hs
+    ghc-options:
+      -main-is Search
+    hs-source-dirs:   app
+
 --executable python-semantics
 --    import: lib-dependent
 --    main-is:          PySemantics.hs
@@ -145,4 +152,10 @@ Test-Suite circuitTests
     import: lib-dependent
     type:             detailed-0.9
     test-module:      TCircuits
+    hs-source-dirs:   tests
+
+Test-Suite pythonTests
+    import: lib-dependent
+    type:             detailed-0.9
+    test-module:      TPython
     hs-source-dirs:   tests

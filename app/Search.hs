@@ -1,5 +1,8 @@
-module RandomCho where
+module Search where
 
+import Control.Exception (catch, SomeException)
+import Data.List (isInfixOf)
+import Data.Word (Word64)
 import GHC.Exts (fromList)
 import Options.Applicative ( (<**>)
                            , auto
@@ -16,36 +19,18 @@ import Options.Applicative ( (<**>)
                            , progDesc
                            , short
                            , some
-                           , value, strOption
+                           , strOption
                            )
 import System.Environment (getArgs)
 import System.Random (newStdGen)
 
-import Choreography (BodyRatios(..), Party(Party), ProgramSize(..), randomProgram)
+import Choreography
 import Utils (pretty)
 
-{-
-data BodyRatios = BodyRatios { compute :: Natural
-                             , send :: Natural
-                             , obliv :: Natural
-                             }
-
-data ProgramSize = ProgramSize { len :: Int
-                               , algWidth :: Int
-                               , secWidth :: Int
-                               , flipWidth :: Int
-                               , outWidth :: Int
-                               , participants :: NonEmpty Party
-                               , bodyRatios :: BodyRatios
-                               , xorPreference :: Natural
-                               , notFrequency :: Double
-                               , sendEagerness :: Double
-                               , oblivComplexity :: Double
-                               }
--}
-
 data Arguments = Arguments { sizing :: ProgramSize
-                           , destination :: Maybe FilePath
+                           , destination :: FilePath
+                           , iters :: IterConfig
+                           , alpha :: Double
                            }
 
 argParser :: Parser Arguments
@@ -79,25 +64,64 @@ argParser = do
     oblivComplexity <- option auto (long "obliv-width"       <> short 'b' <> metaprob
                                     <> help ("The likelyhood (when there are enough distinct variables) "
                                              ++ "that each branch of an OT will be composed of further branching."))
-    destination <- strOption (      long "destination"       <> short 'd' <> metavar "FILE"
-                                    <> help "File to write to instead of stdOut." <> value "")
-    return Arguments{destination = case destination of [] -> Nothing; _ -> Just destination,
+    destination <- strOption (      long "destination"       <> short 'd' <> metavar "PATH"
+                                    <> help "Directory in which to write passing protocols.")
+    iterations <- option auto (     long "iterations"        <> short 'i' <> metavar "ITERATIONS"
+                                    <> help "How many times the cycle to testing and training a decision tree will repeat.")
+    trainingN <- option auto (      long "trainingN"         <> long "tR" <> metanat
+                                    <> help "How many rows of data to train the decision trees on. Should be a multiple of 64.")
+    testingN <- option auto (       long "testingN"          <> long "tS" <> metanat
+                                    <> help "How many rows of data to test the decision trees on. Should be a multiple of 64.")
+    alpha <- option auto (          long "alpha"          <> short 't' <> metaprob
+                                    <> help "The significance threshold for p-value testing. Only protocols that _fail_ this threshold will be saved.")
+    return Arguments{destination,
                      sizing = ProgramSize{len, algWidth, secWidth, flipWidth, outWidth, participants,
                                           bodyRatios = BodyRatios{compute, send, obliv},
-                                          xorPreference, notFrequency, sendEagerness, oblivComplexity}}
+                                          xorPreference, notFrequency, sendEagerness, oblivComplexity},
+                     iters = IterConfig{iterations, trainingN, testingN},
+                     alpha}
   where metanat = metavar "NATURAL"
         metaname = metavar "NAME"
         metaprob = metavar "PROBABILITY"
 
-
 main :: IO ()
 main = do args <- getArgs
-          let comment = "--  " ++ unwords args
-          Arguments{destination, sizing} <- handleParseResult $
-            execParserPure (prefs mempty) (info (argParser <**> helper) (progDesc "Generate a random .cho protocol.")) args
-          q <- newStdGen
-          let p = randomProgram sizing q
-          let cho = pretty p
-          let output = unlines [comment, "", cho, ""]
-          let verb = maybe putStr writeFile destination
-          verb output
+          Arguments{destination, sizing, iters, alpha} <- handleParseResult $
+            execParserPure (prefs mempty)
+                           (info (argParser <**> helper)
+                                 (progDesc "Search for randomly-generated .cho protocols that can't be detected insecure using the provided dtree settings.")) args
+          let fileNames = [destination ++ "/a" ++ show i ++ ".cho"
+                           | i :: Integer <- [1..]]
+          sequence_ $ blindDetermination . attempt sizing iters alpha <$> fileNames
+
+attempt :: ProgramSize -> IterConfig -> Double -> FilePath -> IO ()
+attempt sizing iters alpha destination = do
+  q <- newStdGen
+  let cho = either error id . validate mempty . snd . fakePos 0 $ randomProgram sizing q
+  putStr $ "Generated " ++ show (length cho) ++ " line program. "
+  pval <- experiment_ @Word64 iters cho corruption
+  putStr $ "Measured p-value: " ++ show pval ++ " "
+  if alpha < pval
+    then do writeFile destination $ unlines [makeHeader sizing iters pval,
+                                             render cho]
+            putStr $ "Wrote out to \"" ++ destination ++ "\"."
+    else putStr "Discarding. "
+
+blindDetermination :: IO () -> IO ()
+blindDetermination task = do catch task \(e :: SomeException) -> let m = show e
+                                                                 in putStr if "ValueError: Found array with 0 feature(s)" `isInfixOf` m
+                                                                             then "Ignoring un-assessable protocol."
+                                                                             else m
+                             putStrLn ""
+
+corruption :: PartySet
+corruption = Parties $ fromList [corrupt, p1]
+
+makeHeader :: ProgramSize -> IterConfig -> Double -> String
+makeHeader sizing iters pval = unlines [ "{-"
+                                       , show sizing
+                                       , show iters
+                                       , show pval
+                                       , "-}"
+                                       ]
+
