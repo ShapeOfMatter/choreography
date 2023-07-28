@@ -2,6 +2,7 @@ module Choreography.Random where
 
 import Control.Monad (when, join)
 import Data.Bool (bool)
+import Data.Char (toLower)
 import Data.Functor.Identity (Identity(Identity), runIdentity)
 import Data.List.NonEmpty (NonEmpty((:|)), nonEmpty)
 import Data.Map (keys)
@@ -11,7 +12,7 @@ import qualified Data.Set as S
 import GHC.Exts (fromList, IsList, Item, toList)
 import Numeric.Natural (Natural)
 import Polysemy (Members, run, Sem)
-import Polysemy.Random (attrit, manyOf, oneOf, Random, random, randomR, runRandom, weighted, bernoulli, shuffle)
+import Polysemy.Random (attrit, oneOf, Random, random, randomR, runRandom, weighted, bernoulli, shuffle)
 import Polysemy.Reader (asks, local, Reader, runReader)
 import Polysemy.State (evalState, gets, State)
 import Polysemy.Writer (runWriter, Writer)
@@ -22,7 +23,7 @@ import System.Random (mkStdGen, RandomGen)
 
 import Choreography.AbstractSyntaxTree
 import Choreography.Functors (antimap')
-import Choreography.Party (corrupt, honest, isElementOf, isSubsetOf, Party, singleton, PartySet (Parties))
+import Choreography.Party (corrupt, honest, isElementOf, isSubsetOf, Party(Party), singleton, PartySet (Parties, parties))
 import Choreography.Validate (bindToParties, validateAlg, ValidationState (variables))
 import Utils (squareRoot, failOnError)
 
@@ -86,19 +87,21 @@ buildProgram = do buildSecrets
 buildSecrets :: forall r.
                 (ProgramBuilder r) =>
                 Sem r ()
-buildSecrets = do n <- asks secWidth >>= randomR . (0, )
-                  sequence_ [ do p <- asks participants >>= oneOf
-                                 tell $ Secret (iii $ Variable $ "sec" ++ show i) (iii p)
+buildSecrets = do n <- asks secWidth
+                  ps <- asks $ toList . participants
+                  sequence_ [ tell $ Secret (iii $ Variable $ "sec" ++ (toLower <$> name) ++ show i) (iii p)
                               | i <- [1 .. n]
+                              , p@(Party name) <- ps
                             ]
 
 buildFlips :: forall r.
               (ProgramBuilder r) =>
               Sem r ()
-buildFlips = do n <- asks flipWidth >>= randomR . (0, )
-                sequence_ [ do p <- asks participants >>= oneOf
-                               tell $ Flip (iii $ Variable $ "flp" ++ show i) (iii p)
+buildFlips = do n <- asks flipWidth
+                ps <- asks $ toList . participants
+                sequence_ [ tell $ Flip (iii $ Variable $ "flp" ++ (toLower <$> name) ++ show i) (iii p)
                             | i <- [1 .. n]
+                            , p@(Party name) <- ps
                           ]
 
 buildBody :: forall r.
@@ -113,16 +116,24 @@ buildBody = do n <- asks len
 buildOutputs :: forall r.
                 (ProgramBuilder r) =>
                 Sem r ()
-buildOutputs = do n <- asks outWidth >>= randomR . (1, )
-                  allVars <- gets $ toList . variables
-                  let useableVars = [ var
-                                      | (var, Parties ps) <- allVars
-                                      , not (null ps)  -- we filter out TOP, bc that's not implemented. This _should only affect literals.
-                                      ]
-                  selected <- n `manyOf` useableVars
-                  sequence_ [ tell $ Output $ iii var
-                              | var <- selected
-                            ]
+buildOutputs = do n <- asks outWidth
+                  outNeeds <- asks $ fromList . ((, n) <$>) . toList . participants
+                  -- we filter out TOP, bc that's not implemented. This _should only affect literals.
+                  vars <- gets $ Map.filter (not . null . parties) . variables
+                  buildOutputs' outNeeds vars
+  where buildOutputs' :: Map.Map Party Int -> Map.Map Variable PartySet -> Sem r ()
+        buildOutputs' outNeeds vars
+          | null outNeeds = pure ()
+          | otherwise = case toList vars of
+                          [] -> pure ()
+                          vps : vpss -> do (var, ps) <- oneOf $ vps :| vpss
+                                           tell $ Output $ iii var
+                                           let outNeeds' = Map.filter (0 <) . Map.mapWithKey (\party need -> if party `isElementOf` ps
+                                                                                                               then need - 1
+                                                                                                               else need) $ outNeeds
+                                           let stillNeedy = Parties . fromList . keys $ outNeeds'
+                                           let vars' = Map.filter (`isSubsetOf` stillNeedy) . Map.delete var $ vars
+                                           buildOutputs' outNeeds' vars'
 
 buildCompute :: forall r.
                 (ProgramBuilder r) =>

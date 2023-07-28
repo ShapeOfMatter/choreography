@@ -25,7 +25,6 @@ import System.Environment (getArgs)
 import System.Random (newStdGen)
 
 import Choreography
-import Utils (pretty)
 
 data Arguments = Arguments { sizing :: ProgramSize
                            , destination :: FilePath
@@ -40,11 +39,11 @@ argParser = do
     algWidth <- option auto (       long "alg-width"         <> short 'a' <> metanat
                                     <> help "Maximum terms in a computation line.")
     secWidth <- option auto (       long "secrets"           <> short 's' <> metanat
-                                    <> help "Maximum secrets across all parties.")
+                                    <> help "How many secrets each party has.")
     flipWidth <- option auto (      long "flips"             <> short 'f' <> metanat
-                                    <> help "Maximum flips across all parties.")
+                                    <> help "How many flips each party has.")
     outWidth <- option auto (       long "outputs"           <> short 'o' <> metanat
-                                    <> help "Maximum outputs across all parties.")
+                                    <> help "Max outputs each party may have.")
     participants <- fromList <$> some (Party <$> strOption (
                                     long "party"             <> short 'p' <> metaname
                                                                     <> help "Name of a participating party."))
