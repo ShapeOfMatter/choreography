@@ -28,6 +28,7 @@ import Choreography
 
 data Arguments = Arguments { sizing :: ProgramSize
                            , destination :: FilePath
+                           , filePrefix :: String
                            , iters :: IterConfig
                            , alpha :: Double
                            }
@@ -65,6 +66,8 @@ argParser = do
                                              ++ "that each branch of an OT will be composed of further branching."))
     destination <- strOption (      long "destination"       <> short 'd' <> metavar "PATH"
                                     <> help "Directory in which to write passing protocols.")
+    filePrefix <- strOption (       long "prefix"            <> long "px" <> metavar "WORD"
+                                    <> help "Prefix for sequential filenames, to distinguish between runs.")
     iterations <- option auto (     long "iterations"        <> short 'i' <> metavar "ITERATIONS"
                                     <> help "How many times the cycle to testing and training a decision tree will repeat.")
     trainingN <- option auto (      long "trainingN"         <> long "tR" <> metanat
@@ -73,7 +76,7 @@ argParser = do
                                     <> help "How many rows of data to test the decision trees on. Should be a multiple of 64.")
     alpha <- option auto (          long "alpha"          <> short 't' <> metaprob
                                     <> help "The significance threshold for p-value testing. Only protocols that _fail_ this threshold will be saved.")
-    return Arguments{destination,
+    return Arguments{destination, filePrefix,
                      sizing = ProgramSize{len, algWidth, secWidth, flipWidth, outWidth, participants,
                                           bodyRatios = BodyRatios{compute, send, obliv},
                                           xorPreference, notFrequency, sendEagerness, oblivComplexity},
@@ -85,11 +88,11 @@ argParser = do
 
 main :: IO ()
 main = do args <- getArgs
-          Arguments{destination, sizing, iters, alpha} <- handleParseResult $
+          Arguments{destination, filePrefix, sizing, iters, alpha} <- handleParseResult $
             execParserPure (prefs mempty)
                            (info (argParser <**> helper)
                                  (progDesc "Search for randomly-generated .cho protocols that can't be detected insecure using the provided dtree settings.")) args
-          let fileNames = [destination ++ "/a" ++ show i ++ ".cho"
+          let fileNames = [destination ++ "/" ++ filePrefix ++ show i ++ ".cho"
                            | i :: Integer <- [1..]]
           sequence_ $ blindDetermination . attempt sizing iters alpha <$> fileNames
 
