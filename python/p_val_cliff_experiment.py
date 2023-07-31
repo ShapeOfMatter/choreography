@@ -2,7 +2,7 @@ from subprocess import check_output, Popen, PIPE
 from datetime import datetime
 import time
 
-cho_name = 'a129'
+cho_name = 'a284'
 
 data_size_grid = [2**e for e in range(7, 15)]
 #data_size_grid = [2**e for e in range(7, 10)]
