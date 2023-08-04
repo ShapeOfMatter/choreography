@@ -2,6 +2,8 @@ module Search where
 
 import Control.Exception (catch, SomeException)
 import Data.List (isInfixOf)
+import Data.Time.Clock (getCurrentTime)
+import Data.Time.Format (defaultTimeLocale, formatTime)
 import Data.Word (Word64)
 import GHC.Exts (fromList)
 import Options.Applicative ( (<**>)
@@ -25,6 +27,8 @@ import System.Environment (getArgs)
 import System.Random (newStdGen)
 
 import Choreography
+
+type Logger = String -> IO ()
 
 data Arguments = Arguments { sizing :: ProgramSize
                            , destination :: FilePath
@@ -91,30 +95,34 @@ main = do args <- getArgs
           Arguments{destination, filePrefix, sizing, iters, alpha} <- handleParseResult $
             execParserPure (prefs mempty)
                            (info (argParser <**> helper)
-                                 (progDesc "Search for randomly-generated .cho protocols that can't be detected insecure using the provided dtree settings.")) args
-          let fileNames = [destination ++ "/" ++ filePrefix ++ show i ++ ".cho"
+                                 (progDesc $ "Search for randomly-generated .cho protocols that can't be detected insecure "
+                                           ++ " using the provided dtree settings.")) args
+          time <- getCurrentTime
+          let runName = filePrefix ++ formatTime defaultTimeLocale "%04Y_%b_%d_%H_%M_%S_" time
+          let fileNames = [destination ++ "/" ++ runName ++ show i ++ ".cho"
                            | i :: Integer <- [1..]]
-          sequence_ $ blindDetermination . attempt sizing iters alpha <$> fileNames
+          let writeLog = appendFile $ destination ++ "/" ++ runName ++ "log.txt"
+          mapM_ (blindDetermination writeLog . attempt writeLog sizing iters alpha) fileNames
 
-attempt :: ProgramSize -> IterConfig -> Double -> FilePath -> IO ()
-attempt sizing iters alpha destination = do
+attempt :: Logger -> ProgramSize -> IterConfig -> Double -> FilePath -> IO ()
+attempt writeLog sizing iters alpha destination = do
   q <- newStdGen
   let cho = either error id . validate mempty . snd . fakePos 0 $ randomProgram sizing q
-  putStr $ "Generated " ++ show (length cho) ++ " line program. "
+  writeLog $ "Generated " ++ show (length cho) ++ " line program. "
   pval <- experiment_ @Word64 iters cho corruption
-  putStr $ "Measured p-value: " ++ show pval ++ " "
+  writeLog $ "Measured p-value: " ++ show pval ++ " "
   if alpha < pval
     then do writeFile destination $ unlines [makeHeader sizing iters pval,
                                              render cho]
-            putStr $ "Wrote out to \"" ++ destination ++ "\"."
-    else putStr "Discarding. "
+            writeLog $ "Wrote out to \"" ++ destination ++ "\"."
+    else writeLog "Discarding. "
 
-blindDetermination :: IO () -> IO ()
-blindDetermination task = do catch task \(e :: SomeException) -> let m = show e
-                                                                 in putStr if "ValueError: Found array with 0 feature(s)" `isInfixOf` m
-                                                                             then "Ignoring un-assessable protocol."
-                                                                             else m
-                             putStrLn ""
+blindDetermination :: Logger -> IO () -> IO ()
+blindDetermination writeLog task = do catch task \(e :: SomeException) -> let m = show e
+                                                                          in writeLog if "ValueError: Found array with 0 feature(s)" `isInfixOf` m
+                                                                                        then "Ignoring un-assessable protocol."
+                                                                                        else m
+                                      writeLog "\n"
 
 corruption :: PartySet
 corruption = Parties $ fromList [corrupt, p1]
