@@ -104,7 +104,7 @@ expand :: forall w f. (Functor f, FiniteBits w) => f w -> [f Int8]
 expand fw = [ asByte . (`testBit` i) <$> fw | i <- [0 .. finiteBitSize (undefined :: w) - 1] ]
 
 writeCSV :: (FiniteBits w) => Handle -> Header -> [Map FieldName w] -> IO ()
-writeCSV file h records = do let bs = encodeByName h $ concat (expand <$> records)
+writeCSV file h records = do let bs = encodeByName h $ expand `concatMap` records
                              hPut file bs
 
 printParallelized :: forall w f.
@@ -139,10 +139,12 @@ outsourceTest IterConfig{iterations, trainingN, testingN} h body =
       command = unwords ["python", pythonFile, "-", show iterations, show trainingN, show testingN]
   in withCreateProcess
         (shell command){std_in=CreatePipe, std_err=Inherit, std_out=CreatePipe}
-        (\(Just stdin_hl) (Just stdout_hdl) Nothing ph -> do
+        (\mstdin mstdout _ ph -> do
+           stdin_hdl <- maybe (ioError . userError $ "Didn't get a stdin.") return mstdin
+           stdout_hdl <- maybe (ioError . userError $ "Didn't get a stdout.") return mstdout
            output <- hGetContents stdout_hdl
-           writeCSV stdin_hl h body
-           hClose stdin_hl
+           writeCSV stdin_hdl h body
+           hClose stdin_hdl
            exitCode <- waitForProcess ph
            evaluate $ rnf output  -- Unclear if this is actually doing anything.
            case exitCode of

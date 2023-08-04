@@ -21,7 +21,10 @@ iii :: a -> Identity a
 iii = Identity
 
 header :: Program Identity
-Right header = removeContext <$> parse programParser "_compileTime_:snippits/GMW_header.cho" [litFile|snippits/GMW_header.cho|]
+-- TODO: use template-haskell lift?
+header = case removeContext <$> parse programParser "_compileTime_:snippits/GMW_header.cho" [litFile|snippits/GMW_header.cho|]
+         of Right h -> h
+            Left e -> error $ show e
 
 sharesOf :: forall r.
             (Members '[Reader (Party, Party)

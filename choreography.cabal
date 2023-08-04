@@ -148,15 +148,21 @@ Test-Suite languageTests
     type:             detailed-0.9
     test-module:      Tests
     hs-source-dirs:   tests
+    ghc-options:
+      -Wno-incomplete-uni-patterns
 
 Test-Suite circuitTests
     import: lib-dependent
     type:             detailed-0.9
     test-module:      TCircuits
     hs-source-dirs:   tests
+    ghc-options:
+      -Wno-incomplete-uni-patterns
 
 Test-Suite pythonTests
     import: lib-dependent
     type:             detailed-0.9
     test-module:      TPython
     hs-source-dirs:   tests
+    ghc-options:
+      -Wno-incomplete-uni-patterns
