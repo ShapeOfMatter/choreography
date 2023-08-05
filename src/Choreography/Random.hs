@@ -5,6 +5,7 @@ import Data.Bifunctor (first)
 import Data.Bool (bool)
 import Data.Char (toLower)
 import Data.Functor.Identity (Identity(Identity), runIdentity)
+import Data.List (isPrefixOf)
 import Data.List.NonEmpty (NonEmpty((:|)), nonEmpty)
 import Data.Map (keys)
 import qualified Data.Map as Map
@@ -182,6 +183,7 @@ buildSend = do boundVars <- gets $ toList . variables
                allParties <- toList <$> asks participants
                let options = [ (var, fromList possibleRecipients)
                                | (var, owners) <- boundVars
+                               , not ("sec" `isPrefixOf` variable var)
                                , let possibleRecipients = [p | p <- allParties , not (p `isElementOf` owners)]
                                , not (null possibleRecipients)
                              ]
