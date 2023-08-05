@@ -18,10 +18,11 @@ module Polysemy.Random
   , distributed
   , manyOf
   , oneOf
-  , sample
-  , sampleR
+  , randoms
+  , randomRs
   , shuffle
   , weighted
+  , weightedShuffle
   ) where
 
 import           Control.Monad (filterM)
@@ -119,7 +120,7 @@ shuffle :: forall l r.
             IsList l) =>
            l -> Sem r l
 shuffle xs = do let lxs = toList xs
-                ns <- sample @Int $ length lxs
+                ns <- randoms @Int $ length lxs
                 return . fromList . fmap snd . sortOn fst $ ns `zip` lxs
 
 
@@ -133,6 +134,19 @@ weighted xs = case sum (fst <$> xs) of
                 space | 0 < space -> consume xs <$> randomR (0, space - 1)
                       | otherwise -> error $ "Attempted to sample from a distribution who's weights can not be normalized: "
                                              ++ show ((() <$) <$> xs)
+
+------------------------------------------------------------------------------
+-- | Shuffle weighted values s.t. (e.g.) `Pr[ result_0 == v_i ] = w_i / Σ[w]` (and so on through the list).
+-- Cribbed from http://utopia.duth.gr/~pefraimi/research/data/2007EncOfAlg.pdf ;
+-- it'd be great to have the final paper on hand to be sure I'm using it correctly.
+weightedShuffle :: forall w a r.
+                   (Member Random r,
+                    Floating w, Ord w, R.UniformRange w) =>
+                   [(w, a)] -> Sem r [a]
+weightedShuffle pairs = fmap snd . sortOn fst <$> sequence [ do u <- randomR(0, 1)
+                                                                return(u ** (1 / w), v)
+                                                             | (w, v) <- pairs
+                                                             ]
 
 ------------------------------------------------------------------------------
 -- | Pick randomly from a non-empty possibly-infinite list, using normalized weight annotations.
@@ -152,21 +166,21 @@ consume ((weight, x) :| (x' : xs)) threshold | threshold < weight = x
 
 ------------------------------------------------------------------------------
 -- | Generate n random values.
-sample :: forall a i r.
+randoms :: forall a i r.
           (Integral i,
            R.Uniform a,
            Member Random r) =>
           i -> Sem r [a]
-sample n = sequence . genericReplicate n $ random
+randoms n = sequence . genericReplicate n $ random
 
 ------------------------------------------------------------------------------
 -- | Generate n random values in a range.
-sampleR :: forall a i r.
+randomRs :: forall a i r.
            (Integral i,
             R.UniformRange a,
             Member Random r) =>
            i -> (a, a) -> Sem r [a]
-sampleR n r = sequence . genericReplicate n $ randomR r
+randomRs n r = sequence . genericReplicate n $ randomR r
 
 ------------------------------------------------------------------------------
 -- | Yields 'True' with probability 'p'

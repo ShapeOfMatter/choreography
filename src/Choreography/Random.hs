@@ -1,6 +1,7 @@
 module Choreography.Random where
 
 import Control.Monad (when, join)
+import Data.Bifunctor (first)
 import Data.Bool (bool)
 import Data.Char (toLower)
 import Data.Functor.Identity (Identity(Identity), runIdentity)
@@ -12,9 +13,9 @@ import qualified Data.Set as S
 import GHC.Exts (fromList, IsList, Item, toList)
 import Numeric.Natural (Natural)
 import Polysemy (Members, run, Sem)
-import Polysemy.Random (attrit, oneOf, Random, random, randomR, runRandom, weighted, bernoulli, shuffle)
+import Polysemy.Random (attrit, oneOf, Random, random, randomR, runRandom, weighted, bernoulli, distributed, weightedShuffle)
 import Polysemy.Reader (asks, local, Reader, runReader)
-import Polysemy.State (evalState, gets, State)
+import Polysemy.State (evalState, gets, modify, State)
 import Polysemy.Writer (runWriter, Writer)
 import qualified Polysemy.Writer as W -- so we don't use the wrong tell by accident.
 import Test.QuickCheck (Gen, getSize, Arbitrary (arbitrary))
@@ -33,10 +34,13 @@ jjj :: Identity a -> a
 jjj = runIdentity
 
 type ProgramBuilder r = Members '[ State ValidationState
+                                 , State VariableUsage
                                  , Random
                                  , Reader ProgramSize
                                  , Writer (Program Identity)
                                  ] r
+
+type VariableUsage = Map.Map Variable Natural
 
 data BodyRatios = BodyRatios { compute :: Natural
                              , send :: Natural
@@ -57,7 +61,13 @@ data ProgramSize = ProgramSize { len :: Int
                                } deriving (Show)
 
 randomProgram :: (RandomGen q) => ProgramSize -> q -> Program Identity
-randomProgram params q = fst . run . runWriter . evalState mempty . runRandom q . runReader params $ buildProgram
+randomProgram params q = fst . run
+                           . runWriter
+                           . evalState (mempty @VariableUsage)
+                           . evalState (mempty @ValidationState)
+                           . runRandom q
+                           . runReader params
+                           $ buildProgram
 
 generateProgram :: Gen (Program Identity)
 generateProgram = do size <- getSize
@@ -74,7 +84,7 @@ generateProgram = do size <- getSize
                                              , oblivComplexity = 0.5
                                              }
                      q <- mkStdGen <$> arbitrary
-                     return $ fst . run . runWriter . evalState mempty . runRandom q . runReader params $ buildProgram
+                     return $ randomProgram params q
 
 buildProgram :: forall r.
                 (ProgramBuilder r) =>
@@ -126,7 +136,7 @@ buildOutputs = do n <- asks outWidth
           | null outNeeds = pure ()
           | otherwise = case toList vars of
                           [] -> pure ()
-                          vps : vpss -> do (var, ps) <- oneOf $ vps :| vpss
+                          vps : vpss -> do (var, ps) <- weightedVar $ vps :| vpss
                                            tell $ Output $ iii var
                                            let outNeeds' = Map.filter (0 <) . Map.mapWithKey (\party need -> if party `isElementOf` ps
                                                                                                                then need - 1
@@ -143,13 +153,13 @@ buildCompute = do allVariables <- gets variables
                   -- Because allParties is nonEmpty, the powerset will be nonempty even after we remove the empty set.
                   -- This could be done other ways, but this has the advantage that it's not biased toward `top` computations.
                   ps <- oneOf . (Parties <$>) . fromList . toList . S.delete mempty . S.powerSet . fromList . toList $ allParties
-                  let vars = keys $ Map.filter (ps `isSubsetOf`) allVariables
+                  let vars = toList $ Map.filter (ps `isSubsetOf`) allVariables
                   let buildAlg :: Sem r (Algebra Identity)
                       buildAlg = do size <- asks algWidth
                                     alg <- if size <= 1
                                              then join $ weighted $ (1, Literal . iii . Bit <$> random)
-                                                                    :| maybe [] ((:[]) . (10,) . (Var . iii <$>)) (oneOf <$> nonEmpty vars)
-                                                                    -- TODO: bias to fresher vars?
+                                                                    :| maybe [] (\nevs -> [(10, Var . iii . fst <$> weightedVar nevs)]
+                                                                                ) (nonEmpty vars)
                                              else do left <- randomR (1, size - 1)
                                                      a <- local (\s -> s{algWidth = left}) buildAlg
                                                      b <- local (\s@ProgramSize{algWidth} -> s{algWidth = algWidth - left}) buildAlg
@@ -170,13 +180,13 @@ buildSend :: forall r.
              Sem r Int
 buildSend = do boundVars <- gets $ toList . variables
                allParties <- toList <$> asks participants
-               let options = [ (fromList possibleRecipients, var)
+               let options = [ (var, fromList possibleRecipients)
                                | (var, owners) <- boundVars
                                , let possibleRecipients = [p | p <- allParties , not (p `isElementOf` owners)]
                                , not (null possibleRecipients)
                              ]
                case options of [] -> return 0
-                               v : vs -> do (possibleRecipients, var) <- oneOf $ v :| vs
+                               v : vs -> do (var, possibleRecipients) <- weightedVar $ v :| vs
                                             se <- (1 -) <$> asks sendEagerness
                                             rHead <- oneOf possibleRecipients -- it has to go to at least one new person.
                                             rTail <- attrit se allParties
@@ -184,8 +194,8 @@ buildSend = do boundVars <- gets $ toList . variables
                                             return 1
 
 data OblivOption f1 f2 = OblivOption { recipients :: PartySet
-                                     , sendable :: f1 Variable
-                                     , choosable :: f2 Variable
+                                     , sendable :: f1 (Double, Variable)
+                                     , choosable :: f2 (Double, Variable)
                                      }
 
 buildOblivious :: forall r.
@@ -194,6 +204,8 @@ buildOblivious :: forall r.
 buildOblivious = do allParties <- asks $ fromList . toList . participants
                     let subsets = toList . S.delete allParties . S.delete mempty . S.powerSet $ allParties
                     boundVars <- gets $ toList . variables
+                    weightedVars <- traverse (\(v, owners) -> do w <- useWeight v
+                                                                 return (w, v, owners)) boundVars
                     se <- (1 -) <$> asks sendEagerness
                     options <- sequence [ do let complement = allParties `S.difference` senders
                                              -- NonEmpty.fromList should be safe here bc the S.delete(s) above ensure a non-empty complement.
@@ -202,21 +214,26 @@ buildOblivious = do allParties <- asks $ fromList . toList . participants
                                              -- ideally we would be biased toward recipient lists that have variables we want to use.
                                              let recipients = Parties . fromList $ rHead : rTail
                                              return OblivOption{ recipients
-                                                               , sendable = [v | (v, owners) <- boundVars , Parties senders `isSubsetOf` owners]
-                                                               , choosable = [v | (v, owners) <- boundVars , recipients `isSubsetOf` owners] }
+                                                               , sendable = [(w, v)
+                                                                             | (w, v, owners) <- weightedVars
+                                                                             , Parties senders `isSubsetOf` owners]
+                                                               , choosable = [(w, v)
+                                                                              | (w, v, owners) <- weightedVars
+                                                                              , recipients `isSubsetOf` owners] }
                                           | senders <- subsets
                                         ]
                     case mapMaybe weight options of [] -> return 0
-                                                    o : os -> do opt <- weighted $ o :| os
-                                                                 subjects <- shuffle $ sendable opt
-                                                                 choices <- shuffle $ choosable opt
+                                                    o : os -> do let neos = o :| os
+                                                                 let norm = sum $ fst <$> neos
+                                                                 opt <- distributed $ first (/ norm) <$> neos
+                                                                 subjects <- fromList <$> (weightedShuffle . toList . sendable $ opt)
+                                                                 choices <- fromList <$> (weightedShuffle . toList . choosable $ opt)
                                                                  body <- makeBody subjects choices
                                                                  tell $ Oblivious (iii . Variable $ "obliv" ++ show (length boundVars))
                                                                                   (iii $ recipients opt) (iii body)
                                                                  return 1
   where weight OblivOption{recipients, sendable, choosable} = case (sendable, choosable) of
-                                                                (s1 : s2 : ss, c : cs) -> Just ( min (fromIntegral $ length sendable)
-                                                                                                     (2 ^ length choosable)
+                                                                (s1 : s2 : ss, c : cs) -> Just ( sum $ fst <$> (sendable ++ choosable)
                                                                                                , OblivOption{ recipients
                                                                                                             , sendable = (s1, s2) :|| ss
                                                                                                             , choosable = c :| cs } )
@@ -228,27 +245,31 @@ buildOblivious = do allParties <- asks $ fromList . toList . participants
                                                              let (cs1, cs2) = splitAt cPoint choices
                                                              branch1 <- makeBranch (s1 :| ss1) cs1
                                                              branch2 <- makeBranch (s2 :| ss2) cs2
+                                                             modify $ Map.adjust (+ 1) c
                                                              return $ ObvBody (iii branch1) (iii branch2) (iii c)
-        makeBranch    (s1 :| [])              _             = return $ ObvLeaf s1
-        makeBranch    (s1 :| _)               []            = return $ ObvLeaf s1
-        makeBranch ss@(s1 :| (s2 : subjects)) (c : choices) = do recurse <- asks oblivComplexity >>= bernoulli
-                                                                 if recurse then ObvBranch <$> makeBody ((s1, s2) :|| subjects) (c :| choices)
-                                                                            else ObvLeaf <$> oneOf ss
+        makeBranch (s1 :| [])              _             = modify (Map.adjust (+ 1) s1) >> return (ObvLeaf s1)
+        makeBranch (s1 :| _)               []            = modify (Map.adjust (+ 1) s1) >> return (ObvLeaf s1)
+        makeBranch (s1 :| (s2 : subjects)) (c : choices) = do recurse <- asks oblivComplexity >>= bernoulli
+                                                              if recurse then ObvBranch <$> makeBody ((s1, s2) :|| subjects) (c :| choices)
+                                                                         else modify (Map.adjust (+ 1) s1) >> return (ObvLeaf s1)
 
 tell :: forall r.
         (ProgramBuilder r) =>
         Statement Identity -> Sem r ()
 tell stmnt = do case stmnt of
-                  Secret fv fp -> bindToParties (jjj fv) (singleton $ jjj fp)
-                  Flip fv fp -> bindToParties (jjj fv) (singleton $ jjj fp)
-                  Compute fv falg -> do (ps, _) <- failOnError . validateAlg . antimap' ((Pos.newPos "__INVISIBLE" 0 0,) . runIdentity) $ falg
-                                        bindToParties (jjj fv) ps
-                  Send fps fv -> bindToParties (jjj fv) (jjj fps)
-                  Oblivious fv fps _ -> bindToParties (jjj fv) (jjj fps)
-                  Output _ -> return ()
+                  Secret fv fp                 -> btp fv (singleton <$> fp)
+                  Flip fv fp                   -> btp fv (singleton <$> fp)
+                  Compute fv falg              -> do (ps, _) <- failOnError . validateAlg . antimap' ((Pos.newPos "__INVISIBLE" 0 0,) . runIdentity)
+                                                                  $ falg
+                                                     btp fv (Identity ps)
+                  Send fps fv                  -> btp fv fps
+                  Oblivious fv fps _           -> btp fv fps
+                  Output _                     -> return ()
                   Declaration _fn _pargs _body -> undefined  -- TODO
-                  Call _fn _pargs _bindings -> undefined
+                  Call _fn _pargs _bindings    -> undefined
                 W.tell [iii stmnt]
+  where btp (Identity v) (Identity ps) = do bindToParties v ps
+                                            modify $ Map.insert v 0  -- not the only choice in the case of Send, but I think reasonable.
 
 data DoubleNonEmpty a = (a, a) :|| [a] deriving (Eq, Functor, Ord, Show)
 instance IsList (DoubleNonEmpty a) where
@@ -256,4 +277,21 @@ instance IsList (DoubleNonEmpty a) where
   fromList (x1 : x2 : xs) = (x1, x2) :|| xs
   fromList xs = error $ "Tried to make a DoubleNonEmpty from a list of length " ++ show (length xs) ++ "."
   toList ((x1, x2) :|| xs) = x1 : x2 : xs
+
+useWeight :: (ProgramBuilder r) =>
+             Variable -> Sem r Double
+useWeight v = do mw <- gets (Map.!? v)
+                 case mw of Just w -> return (1 / fromIntegral w)
+                            Nothing -> error $ "Tried to ask the use-weight of free variable " ++ show v ++ "."
+
+weightedVar :: (ProgramBuilder r) =>
+               NonEmpty (Variable, meta) -> Sem r (Variable, meta)
+weightedVar vars = do ws <- traverse fetch vars
+                      let norm = sum $ fst <$> ws
+                      let normalized = first (/ norm) <$> ws
+                      retval@(v, _) <- distributed normalized
+                      modify $ Map.adjust (+ 1) v
+                      return retval
+  where fetch (var, meta) = do w <- useWeight var
+                               return (w, (var, meta))
 
