@@ -4,7 +4,8 @@ import Control.Exception (catch, SomeException)
 import Control.Monad (forM)
 import qualified Data.ByteString.Lazy as ByteString
 import Data.Csv (encode)
-import Data.List (isInfixOf, transpose)
+import Data.List (isInfixOf, transpose, groupBy)
+import Data.Function (on)
 import Data.Maybe (catMaybes)
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
@@ -76,7 +77,8 @@ main = do args <- getArgs
                                            ++ " using the provided dtree settings.")) args
           Just settings@Settings{iters, alpha} <- readMaybe <$> readFile settingsFile
           time <- getCurrentTime
-          let runName = filePrefix ++ takeWhile (/= '.') settingsFile ++ formatTime defaultTimeLocale "%04Y_%b_%d_%H_%M_%S_" time
+          let settingsName = takeWhile (/= '.') . last . groupBy ((&&) `on` (/= '/')) $ settingsFile
+          let runName = filePrefix ++ settingsName ++ formatTime defaultTimeLocale "_%04Y_%b_%d_%H_%M_%S_" time
           let fileNames = [(i <= save, destination ++ "/" ++ runName ++ show i ++ ".cho")
                            | i :: Natural <- [1..totalGenerated]]
           let writeLog = appendFile $ destination ++ "/" ++ runName ++ "log.txt"
