@@ -5,6 +5,7 @@ import Control.Exception (evaluate, Exception, try)
 import Data.Bits (finiteBitSize, testBit)
 import Data.Either (fromRight)
 import Data.Functor.Identity (Identity (runIdentity))
+import Data.Kind (Type)
 import Data.List (uncons)
 import Data.Map.Strict (adjust, Map)
 import Data.Maybe (fromJust, fromMaybe)
@@ -23,6 +24,8 @@ class Pretty a where
   pretty :: a -> String
 instance {-# OVERLAPPING  #-} Pretty String where
   pretty = id
+instance {-# OVERLAPPABLE #-} (Show n, Num n) => Pretty n where
+  pretty = show
 instance Pretty Bool where
   pretty b = show $ fromEnum b
 {-instance Pretty Rational where
@@ -37,7 +40,7 @@ instance Pretty Word64 where
 prettyPrint :: (Pretty a) => a -> IO ()
 prettyPrint = putStrLn . pretty
 
-class Pretty1 (f :: * -> *) where
+class Pretty1 (f :: Type -> Type) where
   prettyf :: f String -> String
 instance Pretty1 Identity where
   prettyf = runIdentity

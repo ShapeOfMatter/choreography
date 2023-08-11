@@ -159,8 +159,9 @@ buildCompute = do allVariables <- gets variables
                       buildAlg = do size <- asks algWidth
                                     alg <- if size <= 1
                                              then join $ weighted $ (1, Literal . iii . Bit <$> random)
-                                                                    :| maybe [] (\nevs -> [(10, Var . iii . fst <$> weightedVar nevs)]
-                                                                                ) (nonEmpty vars)
+                                                                    :| maybe []
+                                                                             (\nevs -> [(10, Var . iii . fst <$> weightedVar nevs)]) 
+                                                                             (nonEmpty vars)
                                              else do left <- randomR (1, size - 1)
                                                      a <- local (\s -> s{algWidth = left}) buildAlg
                                                      b <- local (\s@ProgramSize{algWidth} -> s{algWidth = algWidth - left}) buildAlg
@@ -283,7 +284,7 @@ instance IsList (DoubleNonEmpty a) where
 useWeight :: (ProgramBuilder r) =>
              Variable -> Sem r Double
 useWeight v = do mw <- gets (Map.!? v)
-                 case mw of Just w -> return (1 / fromIntegral w)
+                 case mw of Just w -> return (1 / ( 1 + fromIntegral w))
                             Nothing -> error $ "Tried to ask the use-weight of free variable " ++ show v ++ "."
 
 weightedVar :: (ProgramBuilder r) =>
