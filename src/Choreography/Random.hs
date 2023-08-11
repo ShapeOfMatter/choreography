@@ -46,7 +46,7 @@ type VariableUsage = Map.Map Variable Natural
 data BodyRatios = BodyRatios { compute :: Natural
                              , send :: Natural
                              , obliv :: Natural
-                             } deriving (Show)
+                             } deriving (Read, Show)
 
 data ProgramSize = ProgramSize { len :: Int
                                , algWidth :: Int
@@ -59,7 +59,7 @@ data ProgramSize = ProgramSize { len :: Int
                                , notFrequency :: Double
                                , sendEagerness :: Double
                                , oblivComplexity :: Double
-                               } deriving (Show)
+                               } deriving (Read, Show)
 
 randomProgram :: (RandomGen q) => ProgramSize -> q -> Program Identity
 randomProgram params q = fst . run

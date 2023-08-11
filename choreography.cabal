@@ -114,6 +114,13 @@ executable meso-search
       -main-is Search
     hs-source-dirs:   app
 
+executable experiment
+    import: lib-dependent
+    main-is:          Experiment.hs
+    ghc-options:
+      -main-is Experiment
+    hs-source-dirs:   app
+
 --executable python-semantics
 --    import: lib-dependent
 --    main-is:          PySemantics.hs

@@ -38,7 +38,7 @@ asByte False = 0
 data IterConfig = IterConfig { iterations :: Int
                              , trainingN :: Int
                              , testingN :: Int
-                             } deriving (Show)
+                             } deriving (Read, Show)
 
 requestedIterations :: IterConfig -> Int
 requestedIterations IterConfig{iterations, trainingN, testingN} = iterations * (trainingN + testingN)

@@ -11,7 +11,7 @@ import Utils (Pretty, pretty)
 import Data.Maybe (fromMaybe)
 
 newtype Party = Party {party :: String}
-           deriving (Eq, Ord, Show)
+           deriving (Eq, Ord, Read, Show)
 
 instance Pretty Party where
   pretty = party
