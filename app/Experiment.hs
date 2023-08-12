@@ -64,7 +64,7 @@ argParser = do
                                     <> help "The total number of programs to generate and test.")
     return Arguments{settingsFile, destination,
                      filePrefix = case filePrefix of [] -> ""; fp -> fp ++ "_",
-                     save = if save < 0 then totalGenerated + 1 - fromIntegral save else fromIntegral save,
+                     save = fromIntegral if save < 0 then fromIntegral totalGenerated + 1 + save else fromIntegral save,
                      totalGenerated}
   where metanat = metavar "NAT"
 
