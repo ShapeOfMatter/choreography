@@ -40,7 +40,7 @@ type Logger = String -> IO ()
 
 data Settings = Settings { sizing :: ProgramSize
                          , iters :: [IterConfig]
-                         , alpha :: Double
+                         , alpha :: PValue
                          } deriving (Read, Show)
 
 data Arguments = Arguments { settingsFile :: FilePath
@@ -84,14 +84,14 @@ main = do args <- getArgs
           let writeLog = appendFile $ destination ++ "/" ++ runName ++ "log.txt"
           results <- catMaybes <$> mapM (blindDetermination writeLog . uncurry (attempt writeLog settings)) fileNames
           writeSankey (destination ++ "/" ++ runName ++ ".sankey.txt")
-            . sankey alpha
+            . sankey (`indicatesSecurityBy` alpha)
             . zip (testName <$> iters)
             . transpose
             . (snd <$>)
             $ results
-          writeCSV (destination ++ "/" ++ runName ++ ".csv") alpha (testName <$> iters) results
+          writeCSV (destination ++ "/" ++ runName ++ ".csv") (`indicatesSecurityBy` alpha) (testName <$> iters) results
 
-attempt :: Logger -> Settings -> Bool -> FilePath -> IO (String, [Double])
+attempt :: Logger -> Settings -> Bool -> FilePath -> IO (String, [PValue])
 attempt writeLog Settings{sizing, iters} write destination = do
   q <- newStdGen
   let cho = either error id . validate mempty . snd . fakePos 0 $ randomProgram sizing q
@@ -120,41 +120,43 @@ blindDetermination writeLog task = do retval <- catch (Just <$> task)
 corruption :: PartySet
 corruption = Parties $ fromList [corrupt, p1]
 
-makeHeader :: ProgramSize -> [(IterConfig, Double)] -> String
+makeHeader :: ProgramSize -> [(IterConfig, PValue)] -> String
 makeHeader sizing tests = unlines [ "{-"
                                        , show sizing
                                        , show tests
                                        , "-}"
                                        ]
 
+type SecurityJudgment = PValue -> Bool
+
 testName :: IterConfig -> String
 testName IterConfig{iterations, trainingN, testingN} = "test_" ++ show iterations ++ "_" ++ show trainingN ++ "_" ++ show testingN
 
 
-sankey :: Double -> [(String, [Double])] -> [(String, Int, String)]
-sankey alpha pvals = let thresholded = (<= alpha) <$$$> pvals
+sankey :: SecurityJudgment -> [(String, [PValue])] -> [(String, Int, String)]
+sankey isSec pvals = let thresholded = isSec <$$$> pvals
                          transitions = [ (name1, name2, [\(b1, b2) -> (b1 == v1) && (b2 == v2) | (v1, v2) <- vals1 `zip` vals2])
                                          | ((name1, vals1), (name2, vals2)) <- thresholded `zip` tail thresholded ]
-                         failName = ("F_" ++)
+                         bucketName pass = if pass then ("SEC_" ++) else ("INS_" ++)
                          generations = [("Generated"
                                         ,length . filter (== pass) . snd . head $ thresholded
-                                        ,(if pass then fst . head else failName . fst . head) thresholded)
+                                        ,(bucketName pass . fst . head) thresholded)
                                         | pass <- [True, False]]
                      in generations ++ do (name1, name2, ts) <- transitions
                                           pass1 <- [True, False]
                                           pass2 <- [True, False]
-                                          return (if pass1 then name1 else failName name1
+                                          return (bucketName pass1 name1
                                                  ,length $ filter ($ (pass1, pass2)) ts
-                                                 ,if pass2 then name2 else failName name2)
+                                                 ,bucketName pass2 name2)
 
 writeSankey :: FilePath -> [(String, Int, String)] -> IO ()
 writeSankey f = writeFile f . unlines . (format <$>)
   where format (name1, quantity, name2) = name1 ++ "[" ++ show quantity ++ "]" ++ name2
 
-writeCSV :: FilePath -> Double -> [String] -> [(String, [Double])] -> IO ()
-writeCSV f alpha testNames results = ByteString.writeFile f . encode $ header : body
+writeCSV :: FilePath -> SecurityJudgment -> [String] -> [(String, [PValue])] -> IO ()
+writeCSV f isSec testNames results = ByteString.writeFile f . encode $ header : body
   where header = "filename" : concat [ [name ++ "_p", name ++ "_secure"]
                                        | name <- testNames]
-        body = [ filename : concat [ [show p, show (p <= alpha)]
+        body = [ filename : concat [ [show p, show (isSec p)]
                                      | p <- ps]
                  | (filename, ps) <- results]

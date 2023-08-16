@@ -3,7 +3,7 @@ module TPython where
 import qualified Data.Set as Set
 import Data.Word (Word64)
 import Distribution.TestSuite.QuickCheck
-import Test.QuickCheck (ioProperty, expectFailure)
+import Test.QuickCheck (ioProperty)
 import Text.Parsec (runParser)
 
 import Choreography
@@ -31,8 +31,8 @@ antiHealth = testProperty "Healthcheck could actually fail"
 
 insecureProg :: Test
 insecureProg = testProperty "Insecure program gives low p-value." $ ioProperty do
-    pValue <- experiment_ @Word64 IterConfig{iterations=10, trainingN=64, testingN=64} program (Parties $ Set.singleton p2)
-    return $ pValue < 0.05
+    pValue <- experiment_ @Word64 IterConfig{iterations=20, trainingN=64, testingN=64} program (Parties $ Set.singleton p2)
+    return . not $ pValue `indicatesSecurityBy` PValue 0.01
   where program :: Program Located
         Right program' =  runParser programParser mempty "hardcode example" "\
           \rand = FLIP @P1\n\
@@ -43,9 +43,9 @@ insecureProg = testProperty "Insecure program gives low p-value." $ ioProperty d
         Right program = validate mempty program'
 
 secureProg :: Test
-secureProg = testProperty "Secure program gives a random p-value." $ expectFailure $ ioProperty do
-    pValue <- experiment_ @Word64 IterConfig{iterations=10, trainingN=64, testingN=64} program (Parties $ Set.singleton p2)
-    return $ pValue < 0.05
+secureProg = testProperty "Secure program gives a random p-value. (May randomly fail sometimes!)" $ ioProperty do
+    pValue <- experiment_ @Word64 IterConfig{iterations=20, trainingN=64, testingN=64} program (Parties $ Set.singleton p2)
+    return $ pValue `indicatesSecurityBy` PValue 0.01
   where program :: Program Located
         Right program' = runParser programParser mempty "hardcode example" "\
           \rand = FLIP @P1\n\

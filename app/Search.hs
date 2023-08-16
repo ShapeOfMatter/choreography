@@ -34,7 +34,7 @@ data Arguments = Arguments { sizing :: ProgramSize
                            , destination :: FilePath
                            , filePrefix :: String
                            , iters :: IterConfig
-                           , alpha :: Double
+                           , alpha :: PValue
                            }
 
 argParser :: Parser Arguments
@@ -104,7 +104,7 @@ main = do args <- getArgs
           let writeLog = appendFile $ destination ++ "/" ++ runName ++ "log.txt"
           mapM_ (blindDetermination writeLog . attempt writeLog sizing iters alpha) fileNames
 
-attempt :: Logger -> ProgramSize -> IterConfig -> Double -> FilePath -> IO ()
+attempt :: Logger -> ProgramSize -> IterConfig -> PValue -> FilePath -> IO ()
 attempt writeLog sizing iters alpha destination = do
   q <- newStdGen
   let cho = either error id . validate mempty . snd . fakePos 0 $ randomProgram sizing q

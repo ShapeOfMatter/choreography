@@ -19,7 +19,7 @@ import Polysemy.Random (Random, random, runRandomIO)
 import System.Exit (ExitCode(ExitFailure, ExitSuccess))
 import System.Process (CreateProcess(std_in, std_err, std_out), shell, StdStream(CreatePipe, Inherit), waitForProcess, withCreateProcess)
 import qualified System.Random as R
-import Text.Read (readMaybe)
+import Text.Read (readMaybe, Read (readPrec))
 
 import Choreography.AbstractSyntaxTree (Program, Variable (Variable))
 import Choreography.Functors (Proper)
@@ -122,18 +122,24 @@ printParallelized iters p corruption = do
     body <- runM . runRandomIO $ makeData batches p fields
     writeCSV @w stdout h body
 
+newtype PValue = PValue{pvalue :: Double}  -- I'm too lazy to add deriving strategies just for this, but they may help elsewhere...
+instance Show PValue where show = show . pvalue
+instance Read PValue where readPrec = PValue <$> readPrec
+
+indicatesSecurityBy :: PValue -> PValue -> Bool
+PValue{pvalue=p} `indicatesSecurityBy` PValue{pvalue=alpha} = alpha < p
 
 experiment_ :: forall w f.
                (Proper f, Functor f, Traversable f, Pretty1 f,
                 Semanticable w, R.Uniform w) =>
-                IterConfig -> Program f -> PartySet -> IO Double
+                IterConfig -> Program f -> PartySet -> IO PValue
 experiment_ iters p corruption = do let (batches, _) = batchesOf @w $ requestedIterations iters
                                     let fields = structureFields p corruption
                                     let h = asHeader fields
                                     body <- runM . runRandomIO $ makeData batches p fields
                                     outsourceTest @w iters h body
 
-outsourceTest :: (FiniteBits w) => IterConfig -> Header -> [Map FieldName w] -> IO Double
+outsourceTest :: (FiniteBits w) => IterConfig -> Header -> [Map FieldName w] -> IO PValue
 outsourceTest IterConfig{iterations, trainingN, testingN} h body =
   let pythonFile = "python/d-tree-csv.py"
       command = unwords ["python", pythonFile, "-", show iterations, show trainingN, show testingN]
@@ -148,6 +154,6 @@ outsourceTest IterConfig{iterations, trainingN, testingN} h body =
            exitCode <- waitForProcess ph
            evaluate $ rnf output  -- Unclear if this is actually doing anything.
            case exitCode of
-             ExitSuccess -> maybe (ioError $ userError $ "Couldn't parse " ++ show output) return $ readMaybe @Double output
+             ExitSuccess -> maybe (ioError $ userError $ "Couldn't parse " ++ show output) return $ readMaybe @PValue output
              failure@(ExitFailure _) -> ioError $ userError $ "Call to \"" ++ show pythonFile ++ "\" terminated with " ++ show failure
         )
