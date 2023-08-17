@@ -1,6 +1,6 @@
 module Choreography.DecisionTree where
 
-import Control.DeepSeq (rnf)
+import Control.DeepSeq (NFData, rnf)
 import Control.Exception (evaluate)
 import Control.Monad (replicateM, when)
 import Data.Bits (FiniteBits, finiteBitSize, testBit)
@@ -12,6 +12,7 @@ import Data.Map ((!), fromList, Map, toList)
 import Data.Tuple.Select (sel1, sel2, sel3)
 import Data.Vector (Vector)
 import qualified Data.Vector as V
+import GHC.Generics (Generic)
 import GHC.IO.Handle (Handle, hClose, hGetContents, hPutStr)
 import GHC.IO.Handle.FD (stderr, stdout)
 import Polysemy (Members, runM, Sem)
@@ -38,7 +39,8 @@ asByte False = 0
 data IterConfig = IterConfig { iterations :: Int
                              , trainingN :: Int
                              , testingN :: Int
-                             } deriving (Read, Show)
+                             } deriving (Generic, Read, Show)
+instance NFData IterConfig where {}
 
 requestedIterations :: IterConfig -> Int
 requestedIterations IterConfig{iterations, trainingN, testingN} = iterations * (trainingN + testingN)
@@ -122,7 +124,7 @@ printParallelized iters p corruption = do
     body <- runM . runRandomIO $ makeData batches p fields
     writeCSV @w stdout h body
 
-newtype PValue = PValue{pvalue :: Double}  -- I'm too lazy to add deriving strategies just for this, but they may help elsewhere...
+newtype PValue = PValue{pvalue :: Double} deriving (NFData)  -- I'm too lazy to add deriving strategies just for this, but they may help elsewhere...
 instance Show PValue where show = show . pvalue
 instance Read PValue where readPrec = PValue <$> readPrec
 

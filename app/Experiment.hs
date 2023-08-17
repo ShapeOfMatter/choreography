@@ -1,5 +1,6 @@
 module Experiment where
 
+import Control.DeepSeq (NFData(rnf))
 import Control.Exception (catch, SomeException)
 import Control.Monad (forM)
 import qualified Data.ByteString.Lazy as ByteString
@@ -7,9 +8,10 @@ import Data.Csv (encode)
 import Data.List (isInfixOf, transpose, groupBy)
 import Data.Function (on)
 import Data.Maybe (catMaybes)
-import Data.Time.Clock (getCurrentTime)
+import Data.Time.Clock (diffUTCTime, getCurrentTime, NominalDiffTime, nominalDiffTimeToSeconds)
 import Data.Time.Format (defaultTimeLocale, formatTime)
 import Data.Word (Word64)
+import GHC.IO (evaluate)
 import GHC.Exts (fromList)
 import Numeric.Natural (Natural)
 import Options.Applicative ( (<**>)
@@ -34,7 +36,7 @@ import System.Random (newStdGen)
 import Text.Read (readMaybe)
 
 import Choreography hiding (value, writeCSV)
-import Utils ((<$$$>))
+import Utils ((<$$>), (<$$$>))
 
 type Logger = String -> IO ()
 
@@ -87,20 +89,27 @@ main = do args <- getArgs
             . sankey (`indicatesSecurityBy` alpha)
             . zip (testName <$> iters)
             . transpose
+            . (fst <$$>)
             . (snd <$>)
             $ results
           writeCSV (destination ++ "/" ++ runName ++ ".csv") (`indicatesSecurityBy` alpha) (testName <$> iters) results
 
-attempt :: Logger -> Settings -> Bool -> FilePath -> IO (String, [PValue])
+attempt :: Logger -> Settings -> Bool -> FilePath -> IO (String, [(PValue, NominalDiffTime)])
 attempt writeLog Settings{sizing, iters} write destination = do
   q <- newStdGen
   let cho = either error id . validate mempty . snd . fakePos 0 $ randomProgram sizing q
   writeLog $ "Generated " ++ show (length cho) ++ " line program. "
-  pvals <- forM iters \iter -> do pval <- experiment_ @Word64 iter cho corruption
+  pvals <- forM iters \iter -> do evaluate $ rnf iter
+                                  evaluate $ rnf cho
+                                  evaluate $ rnf corruption
+                                  t1 <- getCurrentTime
+                                  pval <- experiment_ @Word64 iter cho corruption
+                                  evaluate $ rnf pval
+                                  t2 <- getCurrentTime
                                   writeLog $ "Measured p-value: " ++ show pval ++ " "
-                                  return pval
+                                  return (pval, diffUTCTime t2 t1)
   if write
-    then do writeFile destination $ unlines [makeHeader sizing (iters `zip` pvals),
+    then do writeFile destination $ unlines [makeHeader sizing (iters `zip` (fst <$> pvals)),
                                              render cho]
             writeLog $ "Wrote out to \"" ++ destination ++ "\"."
     else writeLog "Discarding. "
@@ -153,10 +162,10 @@ writeSankey :: FilePath -> [(String, Int, String)] -> IO ()
 writeSankey f = writeFile f . unlines . (format <$>)
   where format (name1, quantity, name2) = name1 ++ "[" ++ show quantity ++ "]" ++ name2
 
-writeCSV :: FilePath -> SecurityJudgment -> [String] -> [(String, [PValue])] -> IO ()
+writeCSV :: FilePath -> SecurityJudgment -> [String] -> [(String, [(PValue, NominalDiffTime)])] -> IO ()
 writeCSV f isSec testNames results = ByteString.writeFile f . encode $ header : body
-  where header = "filename" : concat [ [name ++ "_p", name ++ "_secure"]
+  where header = "filename" : concat [ [name ++ "_time", name ++ "_p", name ++ "_secure"]
                                        | name <- testNames]
-        body = [ filename : concat [ [show p, show (isSec p)]
-                                     | p <- ps]
+        body = [ filename : concat [ [show $ nominalDiffTimeToSeconds ndt, show p, show (isSec p)]
+                                     | (p, ndt) <- ps]
                  | (filename, ps) <- results]

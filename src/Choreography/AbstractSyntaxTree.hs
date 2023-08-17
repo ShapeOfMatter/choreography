@@ -1,17 +1,20 @@
 module Choreography.AbstractSyntaxTree where
 
+import Control.DeepSeq (NFData, NFData1)
+import Data.List (intercalate)
+import GHC.Generics (Generic)
+
 import Choreography.Party (Party(..), PartySet)
 import Utils (Pretty, pretty, Pretty1)
-import Data.List (intercalate)
 
 
-newtype Variable = Variable {variable :: String} deriving (Eq, Ord, Show)
+newtype Variable = Variable {variable :: String} deriving (Eq, Generic, NFData, Ord, Show)
 instance Pretty Variable where pretty = variable
 
-newtype FuncName = FuncName {funcName :: String} deriving (Eq, Ord, Show)
+newtype FuncName = FuncName {funcName :: String} deriving (Eq, Generic, NFData, Ord, Show)
 instance Pretty FuncName where pretty = funcName
 
-newtype Bit = Bit { bit :: Bool } deriving (Bounded, Enum, Eq, Ord, Show)
+newtype Bit = Bit { bit :: Bool } deriving (Bounded, Enum, Eq, Generic, NFData, Ord, Show)
 trueNames :: [String]
 trueNames = ["1", "true"]
 falseNames :: [String]
@@ -24,8 +27,9 @@ data Algebra f = Literal (f Bit)
                | Var (f Variable)
                | Xor (f (Algebra f)) (f (Algebra f))
                | And (f (Algebra f)) (f (Algebra f))
-               | Not (f (Algebra f))
+               | Not (f (Algebra f)) deriving (Generic)
 deriving instance (forall a. (Show a) => Show (f a)) => Show (Algebra f)
+instance (NFData1 f, forall b. (NFData b) => NFData (f b)) => NFData (Algebra f) where {}
 xorNames :: [String]
 xorNames = ["⊕", "XOR", "+", "<>", "!=", "⊻"]
 andNames :: [String]
@@ -39,11 +43,14 @@ instance (Pretty1 f, Functor f) => Pretty (Algebra f) where
   pretty (And fa1 fa2) = "(" ++ unwords [pretty fa1, head andNames, pretty fa2] ++ ")"
   pretty (Not fa) = "(" ++ unwords [head notNames, pretty fa] ++ ")"
 
-data ObvBody f = ObvBody (f (ObvChoice f)) (f (ObvChoice f)) (f Variable)
+data ObvBody f = ObvBody (f (ObvChoice f)) (f (ObvChoice f)) (f Variable) deriving (Generic)
 deriving instance (forall a. (Show a) => Show (f a)) => Show (ObvBody f)
+instance (NFData1 f, forall b. (NFData b) => NFData (f b)) => NFData (ObvBody f) where {}
 data ObvChoice f = ObvLeaf Variable
                  | ObvBranch (ObvBody f)
+                 deriving (Generic)
 deriving instance (forall a. (Show a) => Show (f a)) => Show (ObvChoice f)
+instance (NFData1 f, forall b. (NFData b) => NFData (f b)) => NFData (ObvChoice f) where {}
 oblivSymbols :: [String]
 oblivSymbols = ["[ ", ", ", " ]"]
 choiceKeyword :: String
@@ -63,7 +70,9 @@ data Statement f = Compute (f Variable) (f (Algebra f))
                  | Output (f Variable)
                  | Declaration (f FuncName) [(f Party, [f Variable])] (Program f)
                  | Call (f FuncName) [(f Party, [f Variable])] [(f Variable, f Variable)]
+                 deriving (Generic)
 deriving instance (forall a. (Show a) => Show (f a)) => Show (Statement f)
+instance (NFData1 f, forall b. (NFData b) => NFData (f b)) => NFData (Statement f) where {}
 bindKeyword :: String
 bindKeyword = "="
 atKeyword :: String

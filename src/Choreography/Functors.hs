@@ -1,7 +1,9 @@
 module Choreography.Functors where
 
+import Control.DeepSeq (NFData, rnf)
 import Data.Bifunctor (first)
 import Data.Functor.Identity (Identity (Identity), runIdentity)
+import GHC.Generics (Generic)
 import Text.Parsec (SourcePos)
 import qualified Text.Parsec.Pos as Pos
 
@@ -18,8 +20,9 @@ instance Proper ((,) PartySet) where
   owners = fst
   value = snd
 
-data Location = Location { lowners :: PartySet, source :: SourcePos } deriving (Eq, Ord, Show)
+data Location = Location { lowners :: PartySet, source :: SourcePos } deriving (Eq, Generic, Ord, Show)
 instance Pretty Location where pretty = show
+instance NFData Location where rnf Location{lowners, source} = lowners `seq` source `seq` ()  -- it probably doesn't matter if this is perfect?
 type Located = (,) Location
 instance Proper Located where
   owners = lowners . fst

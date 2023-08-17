@@ -1,22 +1,28 @@
 module Choreography.Party
 where
 
+import Control.DeepSeq (NFData)
 import Data.Functor.Identity (Identity(..))
 import Data.List (intercalate)
 import Data.Map.Strict ((!?), Map)
+import Data.Maybe (fromMaybe)
 import Data.Set (disjoint, empty, Set, toList)
 import qualified Data.Set as Set
+import GHC.Generics (Generic)
 
 import Utils (Pretty, pretty)
-import Data.Maybe (fromMaybe)
 
 newtype Party = Party {party :: String}
-           deriving (Eq, Ord, Read, Show)
+           deriving (Eq, Generic, Ord, Read, Show)
+
+instance NFData Party where {}
 
 instance Pretty Party where
   pretty = party
 
-newtype PartySet = Parties {parties :: Set Party} deriving (Eq, Ord, Show)
+newtype PartySet = Parties {parties :: Set Party} deriving (Eq, Generic, Ord, Show)
+
+instance NFData PartySet where {}
 
 instance Pretty PartySet where
   pretty (Parties ps) | null ps = "⊤"
