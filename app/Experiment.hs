@@ -166,6 +166,6 @@ writeCSV :: FilePath -> SecurityJudgment -> [String] -> [(String, [(PValue, Nomi
 writeCSV f isSec testNames results = ByteString.writeFile f . encode $ header : body
   where header = "filename" : concat [ [name ++ "_time", name ++ "_p", name ++ "_secure"]
                                        | name <- testNames]
-        body = [ filename : concat [ [show $ nominalDiffTimeToSeconds ndt, show p, show (isSec p)]
+        body = [ filename : concat [ [show $ nominalDiffTimeToSeconds ndt, show p, show . fromEnum . isSec $ p]
                                      | (p, ndt) <- ps]
                  | (filename, ps) <- results]
