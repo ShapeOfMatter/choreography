@@ -7,7 +7,7 @@ import qualified Data.ByteString.Lazy as ByteString
 import Data.Csv (encode)
 import Data.List (isInfixOf, transpose, groupBy)
 import Data.Function (on)
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Time.Clock (diffUTCTime, getCurrentTime, NominalDiffTime, nominalDiffTimeToSeconds)
 import Data.Time.Format (defaultTimeLocale, formatTime)
 import Data.Word (Word64)
@@ -43,6 +43,7 @@ type Logger = String -> IO ()
 data Settings = Settings { sizing :: ProgramSize
                          , iters :: [IterConfig]
                          , alpha :: PValue
+                         , screen :: Maybe IterConfig
                          } deriving (Read, Show)
 
 data Arguments = Arguments { settingsFile :: FilePath
@@ -77,7 +78,7 @@ main = do args <- getArgs
                            (info (argParser <**> helper)
                                  (progDesc $ "Randomly generate .cho protocols and check their security"
                                            ++ " using the provided dtree settings.")) args
-          Just settings@Settings{iters, alpha} <- readMaybe <$> readFile settingsFile
+          settings@Settings{iters, alpha} <- fromMaybe (error "Couldn't parse settings file.") . readMaybe <$> readFile settingsFile
           time <- getCurrentTime
           let settingsName = takeWhile (/= '.') . last . groupBy ((&&) `on` (/= '/')) $ settingsFile
           let runName = filePrefix ++ settingsName ++ formatTime defaultTimeLocale "_%04Y_%b_%d_%H_%M_%S_" time
@@ -95,9 +96,8 @@ main = do args <- getArgs
           writeCSV (destination ++ "/" ++ runName ++ ".csv") (`indicatesSecurityBy` alpha) (testName <$> iters) results
 
 attempt :: Logger -> Settings -> Bool -> FilePath -> IO (String, [(PValue, NominalDiffTime)])
-attempt writeLog Settings{sizing, iters} write destination = do
-  q <- newStdGen
-  let cho = either error id . validate mempty . snd . fakePos 0 $ randomProgram sizing q
+attempt writeLog Settings{sizing, iters, screen, alpha} write destination = do
+  cho <- preSceenGeneration screen alpha sizing
   writeLog $ "Generated " ++ show (length cho) ++ " line program. "
   pvals <- forM iters \iter -> do evaluate $ rnf iter
                                   evaluate $ rnf cho
@@ -114,6 +114,15 @@ attempt writeLog Settings{sizing, iters} write destination = do
             writeLog $ "Wrote out to \"" ++ destination ++ "\"."
     else writeLog "Discarding. "
   return (destination, pvals)
+
+preSceenGeneration :: Maybe IterConfig -> PValue -> ProgramSize -> IO (Program Located)
+preSceenGeneration screen alpha sizing =
+  do q <- newStdGen
+     let cho = either error id . validate mempty . snd . fakePos 0 $ randomProgram sizing q
+     use <- case screen of Nothing -> pure True
+                           Just test -> (`indicatesSecurityBy` alpha) <$> experiment_ @Word64 test cho corruption
+     if use then return cho
+            else preSceenGeneration screen alpha sizing
 
 blindDetermination :: Logger -> IO a -> IO (Maybe a)
 blindDetermination writeLog task = do retval <- catch (Just <$> task)
