@@ -5,7 +5,7 @@ import pandas as pd
 from scipy.stats import ttest_ind
 from sklearn import tree
 from sklearn.multioutput import ClassifierChain
-from sys import stderr
+from sys import (exit, stderr)
 
 argp = ArgumentParser(description="Run the decision tree test on a csv of data.")
 argp.add_argument("file", type=FileType('r', 1, encoding='utf_8', errors='strict'))
@@ -17,6 +17,14 @@ args = argp.parse_args()
 NUM_ITERS = args.iterations
 NUM_TRAIN = args.trainingN
 PER_ITER = NUM_TRAIN + args.testingN
+
+try:
+    with open("./cores") as cores_file:
+        CORES = int(cores_file.read())
+except FileNotFoundError:
+    exit(f"{__file__} was unable to find a file named \"./cores\" to tell it how many machine cores to use.")
+except ValueError:
+    exit(f"{__file__} was unable to parse \"./cores\" as an integer.")
 
 df = pd.read_csv(args.file)
 
@@ -64,7 +72,7 @@ def run_iter(features1, features2, labels):
     return (score1, score2)
 
 try:
-    results = Parallel(n_jobs=4)(delayed(run_iter)(f1, f2, l)
+    results = Parallel(n_jobs=CORES)(delayed(run_iter)(f1, f2, l)
                                  for f1, f2, l
                                  in zip(np.array_split(features1, NUM_ITERS),
                                         np.array_split(features2, NUM_ITERS),
