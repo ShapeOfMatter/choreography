@@ -111,7 +111,7 @@ attempt writeLog sizing iters alpha destination = do
   writeLog $ "Generated " ++ show (length cho) ++ " line program. "
   pval <- experiment_ @Word64 iters cho corruption
   writeLog $ "Measured p-value: " ++ show pval ++ " "
-  if alpha < pval
+  if pval `indicatesSecurityBy` alpha
     then do writeFile destination $ unlines [makeHeader sizing iters pval,
                                              render cho]
             writeLog $ "Wrote out to \"" ++ destination ++ "\"."
@@ -127,7 +127,7 @@ blindDetermination writeLog task = do catch task \(e :: SomeException) -> let m 
 corruption :: PartySet
 corruption = Parties $ fromList [corrupt, p1]
 
-makeHeader :: ProgramSize -> IterConfig -> Double -> String
+makeHeader :: ProgramSize -> IterConfig -> PValue -> String
 makeHeader sizing iters pval = unlines [ "{-"
                                        , show sizing
                                        , show iters
