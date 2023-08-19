@@ -2,10 +2,10 @@ module Experiment where
 
 import Control.DeepSeq (NFData(rnf))
 import Control.Exception (catch, SomeException)
-import Control.Monad (forM)
+import Control.Monad (foldM)
 import qualified Data.ByteString.Lazy as ByteString
 import Data.Csv (encode)
-import Data.List (isInfixOf, transpose, groupBy)
+import Data.List (isInfixOf, transpose, groupBy, uncons)
 import Data.Function (on)
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Time.Clock (diffUTCTime, getCurrentTime, NominalDiffTime, nominalDiffTimeToSeconds)
@@ -44,6 +44,7 @@ data Settings = Settings { sizing :: ProgramSize
                          , iters :: [IterConfig]
                          , alpha :: PValue
                          , screen :: Maybe IterConfig
+                         , truncatePower :: Maybe Natural
                          } deriving (Read, Show)
 
 data Arguments = Arguments { settingsFile :: FilePath
@@ -90,39 +91,51 @@ main = do args <- getArgs
             . sankey (`indicatesSecurityBy` alpha)
             . zip (testName <$> iters)
             . transpose
-            . (fst <$$>)
+            . (fromMaybe (PValue 0) <$$>)
+            . (fst <$$$>)
             . (snd <$>)
             $ results
           writeCSV (destination ++ "/" ++ runName ++ ".csv") (`indicatesSecurityBy` alpha) (testName <$> iters) results
 
-attempt :: Logger -> Settings -> Bool -> FilePath -> IO (String, [(PValue, NominalDiffTime)])
-attempt writeLog Settings{sizing, iters, screen, alpha} write destination = do
-  cho <- preSceenGeneration screen alpha sizing
+attempt :: Logger -> Settings -> Bool -> FilePath -> IO (String, [Maybe (PValue, NominalDiffTime)])
+attempt writeLog settings@Settings{sizing, iters, screen, alpha} write destination = do
+  cho <- preScreenGeneration screen alpha sizing
   writeLog $ "Generated " ++ show (length cho) ++ " line program. "
-  pvals <- forM iters \iter -> do evaluate $ rnf iter
-                                  evaluate $ rnf cho
-                                  evaluate $ rnf corruption
-                                  t1 <- getCurrentTime
-                                  pval <- experiment_ @Word64 iter cho corruption
-                                  evaluate $ rnf pval
-                                  t2 <- getCurrentTime
-                                  writeLog $ "Measured p-value: " ++ show pval ++ " "
-                                  return (pval, diffUTCTime t2 t1)
+  pvals <- foldM (doTests writeLog settings cho) [] iters
   if write
-    then do writeFile destination $ unlines [makeHeader sizing (iters `zip` (fst <$> pvals)),
+    then do writeFile destination $ unlines [makeHeader sizing (iters `zip` (fst <$$> pvals)),
                                              render cho]
             writeLog $ "Wrote out to \"" ++ destination ++ "\"."
     else writeLog "Discarding. "
   return (destination, pvals)
 
-preSceenGeneration :: Maybe IterConfig -> PValue -> ProgramSize -> IO (Program Located)
-preSceenGeneration screen alpha sizing =
+doTests :: Logger -> Settings -> Program Located -> [Maybe (PValue, NominalDiffTime)] -> IterConfig -> IO [Maybe (PValue, NominalDiffTime)]
+doTests writeLog Settings{alpha, truncatePower} cho acc iter = (acc ++) . (:[]) <$>
+  if keepGoing truncatePower $ uncons . reverse $ acc
+    then do evaluate $ rnf iter
+            evaluate $ rnf cho
+            evaluate $ rnf corruption
+            t1 <- getCurrentTime
+            pval <- experiment_ @Word64 iter cho corruption
+            evaluate $ rnf pval
+            t2 <- getCurrentTime
+            writeLog $ "Measured p-value: " ++ show pval ++ " "
+            return $ Just (pval, diffUTCTime t2 t1)
+    else pure Nothing
+  where keepGoing :: Maybe Natural -> Maybe (Maybe (PValue, NominalDiffTime), [Maybe (PValue, NominalDiffTime)]) -> Bool
+        keepGoing _         Nothing                          = True   -- uncons gives Nothing for []
+        keepGoing Nothing   _                                = True   -- if no truncatePower, allways do all iters
+        keepGoing _         (Just (Nothing,              _)) = False  -- if we skipped last time, keep skipping
+        keepGoing (Just tp) (Just (Just (mostRecent, _), _)) = mostRecent `indicatesSecurityBy` PValue (pvalue alpha ^ tp)
+
+preScreenGeneration :: Maybe IterConfig -> PValue -> ProgramSize -> IO (Program Located)
+preScreenGeneration screen alpha sizing =
   do q <- newStdGen
      let cho = either error id . validate mempty . snd . fakePos 0 $ randomProgram sizing q
      use <- case screen of Nothing -> pure True
                            Just test -> (`indicatesSecurityBy` alpha) <$> experiment_ @Word64 test cho corruption
      if use then return cho
-            else preSceenGeneration screen alpha sizing
+            else preScreenGeneration screen alpha sizing
 
 blindDetermination :: Logger -> IO a -> IO (Maybe a)
 blindDetermination writeLog task = do retval <- catch (Just <$> task)
@@ -138,7 +151,7 @@ blindDetermination writeLog task = do retval <- catch (Just <$> task)
 corruption :: PartySet
 corruption = Parties $ fromList [corrupt, p1]
 
-makeHeader :: ProgramSize -> [(IterConfig, PValue)] -> String
+makeHeader :: ProgramSize -> [(IterConfig, Maybe PValue)] -> String
 makeHeader sizing tests = unlines [ "{-"
                                        , show sizing
                                        , show tests
@@ -171,10 +184,11 @@ writeSankey :: FilePath -> [(String, Int, String)] -> IO ()
 writeSankey f = writeFile f . unlines . (format <$>)
   where format (name1, quantity, name2) = name1 ++ "[" ++ show quantity ++ "]" ++ name2
 
-writeCSV :: FilePath -> SecurityJudgment -> [String] -> [(String, [(PValue, NominalDiffTime)])] -> IO ()
+writeCSV :: FilePath -> SecurityJudgment -> [String] -> [(String, [Maybe (PValue, NominalDiffTime)])] -> IO ()
 writeCSV f isSec testNames results = ByteString.writeFile f . encode $ header : body
   where header = "filename" : concat [ [name ++ "_time", name ++ "_p", name ++ "_secure"]
                                        | name <- testNames]
-        body = [ filename : concat [ [show $ nominalDiffTimeToSeconds ndt, show p, show . fromEnum . isSec $ p]
-                                     | (p, ndt) <- ps]
+        body = [ filename : concatMap triplet  ps
                  | (filename, ps) <- results]
+        triplet Nothing = ["NA", "NA", show . fromEnum $ False]
+        triplet (Just (p, ndt)) = [show $ nominalDiffTimeToSeconds ndt, show p, show . fromEnum . isSec $ p]
