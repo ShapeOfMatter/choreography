@@ -1,7 +1,14 @@
 import sys
+import random
 
 assert len(sys.argv) == 3
 
+config = {
+    'bias_sharing': 0,
+    'bias_and': 0,
+    'accidental_secret': 0.0,
+    'accidental_gate': 1.0,
+    }
 
 circuit_filename = sys.argv[1]
 output_filename = sys.argv[2]
@@ -53,23 +60,36 @@ def gen_inv(a):
 def gen_and(a, b):
     out = gensym('g')
     emit(f'DO and_gmw(P1({a}_1, {b}_1), P2({a}_2, {b}_2)) GET({out}_1=out1, {out}_2=out2)')
+    if random.random() < config['accidental_gate']:
+        emit(f'SEND {out}_2 TO P1 -- accidental send to corrupt')
     return out
 
+def gen_randomness(bias_level, party):
+    output = ""
+    for i in range(bias_level+1):
+        output += f'f{i} = FLIP @{party}\n  '
+    exp = ' ^ '.join([f'f{i}' for i in range(bias_level+1)])
+    return exp, output
 
-header = """
+share_randomness_var, share_randomness_defs = gen_randomness(config['bias_sharing'], 'P1')
+and_randomness_var, and_randomness_defs = gen_randomness(config['bias_and'], 'P2')
+
+header = f"""
 MACRO secret_share(P1(x), P2()) AS
-  s1 = FLIP @P1
+  {share_randomness_defs}
+  s1 = {share_randomness_var}
   s2 = x + s1
   SEND s1 TO P2
 ENDMACRO
 
-MACRO and_gmw(P1(x1, y1), P2(x2, y2)) AS
-  out1 = FLIP @P1
-  g1_s2_00 = out1 + ((x1 + 0) ^ (y1 + 0))
-  g1_s2_01 = out1 + ((x1 + 0) ^ (y1 + 1))
-  g1_s2_10 = out1 + ((x1 + 1) ^ (y1 + 0))
-  g1_s2_11 = out1 + ((x1 + 1) ^ (y1 + 1))
-  out2 = OBLIVIOUSLY [[g1_s2_00, g1_s2_01]?y2, [g1_s2_10, g1_s2_11]?y2]?x2 FOR P2
+MACRO and_gmw(P1(x2, y2), P2(x1, y1)) AS
+  {and_randomness_defs}
+  out2 = {and_randomness_var}
+  g1_s2_00 = out2 + ((x1 + 0) ^ (y1 + 0))
+  g1_s2_01 = out2 + ((x1 + 0) ^ (y1 + 1))
+  g1_s2_10 = out2 + ((x1 + 1) ^ (y1 + 0))
+  g1_s2_11 = out2 + ((x1 + 1) ^ (y1 + 1))
+  out1 = OBLIVIOUSLY [[g1_s2_00, g1_s2_01]?y2, [g1_s2_10, g1_s2_11]?y2]?x2 FOR P1
 ENDMACRO
 
 MACRO reveal(P1(x1), P2(x2)) AS
@@ -86,10 +106,14 @@ ys = [f'y{i}' for i in input_wires[1]]
 emit('-- Read secrets')
 for xi in xs:
     emit(f'{xi} = SECRET @P1')
+    #emit(f'SEND {xi} TO P2')
 
 emit()
 for yi in ys:
     emit(f'{yi} = SECRET @P2')
+    if random.random() < config['accidental_secret']:
+        emit(f'SEND {yi} TO P1 -- accidental send secret to corrupt')
+    
 
 emit()
 emit('-- Set up shares')
