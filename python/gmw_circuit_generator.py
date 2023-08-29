@@ -1,7 +1,5 @@
-import sys
+from circuit_generator import gensym, emit, gen_circuit, gen_randomness
 import random
-
-assert len(sys.argv) == 3
 
 config = {
     'bias_sharing': 0,
@@ -10,40 +8,6 @@ config = {
     'accidental_gate': 1.0,
     }
 
-circuit_filename = sys.argv[1]
-output_filename = sys.argv[2]
-f = open(output_filename, "w")
-
-with open(circuit_filename, "r") as c:
-    circuit_lines = c.readlines()
-
-
-num_gates, num_wires = [int(x) for x in circuit_lines[0].strip().split(' ')]
-inputs_line = circuit_lines[1].strip().split(' ')
-outputs_line = circuit_lines[2].strip().split(' ')
-
-input_bits = [int(x) for x in inputs_line[1:]]
-output_bits = [int(x) for x in outputs_line[1:]]
-
-input_wires = []
-current_wire = 0
-for bw in input_bits:
-    input_wires.append(list(range(current_wire, current_wire+bw)))
-    current_wire += bw
-
-assert len(input_wires) == 2
-assert len(output_bits) == 1
-
-gate_lines = circuit_lines[4:]
-
-gn = 0
-def gensym(x):
-    global gn
-    gn += 1
-    return f'{x}{gn}'
-
-def emit(s=''):
-    f.write(s + '\n')
 
 def gen_xor(a, b):
     out = gensym('g')
@@ -64,12 +28,7 @@ def gen_and(a, b):
         emit(f'SEND {out}_2 TO P1 -- accidental send to corrupt')
     return out
 
-def gen_randomness(bias_level, party):
-    output = ""
-    for i in range(bias_level+1):
-        output += f'f{i} = FLIP @{party}\n  '
-    exp = ' ^ '.join([f'f{i}' for i in range(bias_level+1)])
-    return exp, output
+generators = {'AND': gen_and, 'XOR': gen_xor, 'INV': gen_inv}
 
 share_randomness_var, share_randomness_defs = gen_randomness(config['bias_sharing'], 'P1')
 and_randomness_var, and_randomness_defs = gen_randomness(config['bias_and'], 'P2')
@@ -98,78 +57,5 @@ MACRO reveal(P1(x1), P2(x2)) AS
   y = x1 + x2
 ENDMACRO
 """
-emit(header)
 
-xs = [f'x{i}' for i in input_wires[0]]
-ys = [f'y{i}' for i in input_wires[1]]
-
-emit('-- Read secrets')
-for xi in xs:
-    emit(f'{xi} = SECRET @P1')
-    #emit(f'SEND {xi} TO P2')
-
-emit()
-for yi in ys:
-    emit(f'{yi} = SECRET @P2')
-    if random.random() < config['accidental_secret']:
-        emit(f'SEND {yi} TO P1 -- accidental send secret to corrupt')
-    
-
-emit()
-emit('-- Set up shares')
-for xi in xs:
-    emit(f'DO secret_share(P1({xi}), P2()) GET({xi}_1=s2, {xi}_2=s1)')
-
-emit()
-for yi in ys:
-    emit(f'DO secret_share(P2({yi}), P1()) GET({yi}_1=s1, {yi}_2=s2)')
-
-##################################################
-# Gates
-##################################################
-emit()
-emit('-- Circuit evaluation')
-
-wire_names = {}
-for x, i in zip(xs, input_wires[0]):
-    wire_names[i] = x
-for y, i in zip(ys, input_wires[1]):
-    wire_names[i] = y
-
-for gl in gate_lines:
-    gate_params = gl.strip().split(' ')
-    gate_type = gate_params[-1]
-
-    if gate_type == 'INV':
-        inputs, outputs, in1, out, t = gate_params
-        out_name = gen_inv(wire_names[int(in1)])
-        wire_names[int(out)] = out_name
-
-    elif gate_type == 'XOR':
-        inputs, outputs, in1, in2, out, t = gate_params
-        out_name = gen_xor(wire_names[int(in1)],
-                           wire_names[int(in2)])
-        wire_names[int(out)] = out_name
-
-    elif gate_type == 'AND':
-        inputs, outputs, in1, in2, out, t = gate_params
-        out_name = gen_and(wire_names[int(in1)],
-                           wire_names[int(in2)])
-        wire_names[int(out)] = out_name
-
-    elif gate_type == '':
-        pass
-    else:
-        raise Exception('unknown gate', gate_params)
-
-output_wires= list(sorted(wire_names.keys()))[-output_bits[0]:]
-output_names = [wire_names[k] for k in output_wires]
-
-emit()
-emit('-- Reveal output')
-rs = [f'r{i}' for i in range(len(output_names))]
-for o, r in zip(output_names, rs):
-    emit(f'DO reveal(P1({o}_1), P2({o}_2)) GET({r}=y)')
-    emit(f'OUTPUT {r}')
-
-f.close()
+gen_circuit(config, generators, header)
