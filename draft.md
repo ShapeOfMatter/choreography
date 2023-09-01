@@ -2,6 +2,8 @@
 
 ## Introduction
 
+### Motivation
+
 ### Contributions
 
 
@@ -30,13 +32,17 @@ dice
 
 lilac
 
-### Probablistic tests of distributional equality
+### Probabilistic tests of distributional equality
 
 
 ## The tool in theory
 
 
 ## The tool in practice
+
+### A Choreography Language
+
+### Random generation of programs
 
 ### Performance analysis
 
