@@ -27,7 +27,25 @@ def gen_inv(a):
 
 def gen_and(a, b):
     out = gensym('g')
-    emit(f'DO and_gmw(P1({a}_1, {b}_1), P2({a}_2, {b}_2)) GET({out}_1=out1, {out}_2=out2)')
+    ta_1 = gensym('t')
+    ta_2 = gensym('t')
+    tb_1 = gensym('t')
+    tb_2 = gensym('t')
+    tc_1 = gensym('t')
+    tc_2 = gensym('t')
+
+    a_1 = random.randint(0, 1)
+    a_2 = random.randint(0, 1)
+    b_1 = random.randint(0, 1)
+    b_2 = random.randint(0, 1)
+    c_1 = random.randint(0, 1)
+    c_2 = ((a_1 ^ a_2) & (b_1 ^ b_2)) ^ c_1
+    assert (a_1 ^ a_2) & (b_1 ^ b_2) == c_1 ^ c_2
+
+    for name, val in [(ta_1, a_1), (ta_2, a_2), (tb_1, b_1), (tb_2, b_2), (tc_1, c_1), (tc_2, c_2)]:
+        emit(f'{name} = {val}')
+
+    emit(f'DO and_beaver(P1({a}_1, {b}_1, {ta_1}, {tb_1}, {tc_1}), P2({a}_2, {b}_2, {ta_2}, {tb_2}, {tc_2})) GET({out}_1=out1, {out}_2=out2)')
     if random.random() < config['accidental_gate']:
         emit(f'SEND {out}_2 TO P1 -- accidental send to corrupt')
     return out
@@ -45,14 +63,20 @@ MACRO secret_share(P1(x), P2()) AS
   SEND s1 TO P2
 ENDMACRO
 
-MACRO and_gmw(P1(x2, y2), P2(x1, y1)) AS
-  {and_randomness_defs}
-  out2 = {and_randomness_var}
-  g1_s2_00 = out2 + ((x1 + 0) ^ (y1 + 0))
-  g1_s2_01 = out2 + ((x1 + 0) ^ (y1 + 1))
-  g1_s2_10 = out2 + ((x1 + 1) ^ (y1 + 0))
-  g1_s2_11 = out2 + ((x1 + 1) ^ (y1 + 1))
-  out1 = OBLIVIOUSLY [[g1_s2_00, g1_s2_01]?y2, [g1_s2_10, g1_s2_11]?y2]?x2 FOR P1
+MACRO and_beaver(P1(x2, y2, a1, b1, c1), P2(x1, y1, a2, b2, c2)) AS
+  d1 = x2 + a1
+  d2 = x1 + a2
+  SEND d1 TO P2
+  SEND d2 TO P1
+  d = d1 + d2
+  e1 = y2 + b1
+  e2 = y1 + b2
+  SEND e1 TO P2
+  SEND e2 TO P1
+  e = e1 + e2
+
+  out1 = (d ^ e) + (d ^ b1) + (e ^ a1) + c1
+  out2 = (d ^ e) + (d ^ b2) + (e ^ a2) + c2
 ENDMACRO
 
 MACRO reveal(P1(x1), P2(x2)) AS
