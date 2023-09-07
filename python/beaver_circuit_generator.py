@@ -27,25 +27,8 @@ def gen_inv(a):
 
 def gen_and(a, b):
     out = gensym('g')
-    ta_1 = gensym('t')
-    ta_2 = gensym('t')
-    tb_1 = gensym('t')
-    tb_2 = gensym('t')
-    tc_1 = gensym('t')
-    tc_2 = gensym('t')
 
-    a_1 = random.randint(0, 1)
-    a_2 = random.randint(0, 1)
-    b_1 = random.randint(0, 1)
-    b_2 = random.randint(0, 1)
-    c_1 = random.randint(0, 1)
-    c_2 = ((a_1 ^ a_2) & (b_1 ^ b_2)) ^ c_1
-    assert (a_1 ^ a_2) & (b_1 ^ b_2) == c_1 ^ c_2
-
-    for name, val in [(ta_1, a_1), (ta_2, a_2), (tb_1, b_1), (tb_2, b_2), (tc_1, c_1), (tc_2, c_2)]:
-        emit(f'{name} = {val}')
-
-    emit(f'DO and_beaver(P1({a}_1, {b}_1, {ta_1}, {tb_1}, {tc_1}), P2({a}_2, {b}_2, {ta_2}, {tb_2}, {tc_2})) GET({out}_1=out1, {out}_2=out2)')
+    emit(f'DO and_beaver(P1({a}_1, {b}_1), P2({a}_2, {b}_2)) GET({out}_1=out1, {out}_2=out2)')
     if random.random() < config['accidental_gate']:
         emit(f'SEND {out}_2 TO P1 -- accidental send to corrupt')
     return out
@@ -53,7 +36,12 @@ def gen_and(a, b):
 generators = {'AND': gen_and, 'XOR': gen_xor, 'INV': gen_inv}
 
 share_randomness_var, share_randomness_defs = gen_randomness(config['bias_sharing'], 'P1')
-and_randomness_var, and_randomness_defs = gen_randomness(config['bias_and'], 'P2')
+a1, a1_defs = gen_randomness(config['bias_and'], 'P3')
+a2, a2_defs = gen_randomness(config['bias_and'], 'P3')
+b1, b1_defs = gen_randomness(config['bias_and'], 'P3')
+b2, b2_defs = gen_randomness(config['bias_and'], 'P3')
+c1, c1_defs = gen_randomness(config['bias_and'], 'P3')
+c2, c2_defs = gen_randomness(config['bias_and'], 'P3')
 
 header = f"""
 MACRO secret_share(P1(x), P2()) AS
@@ -63,7 +51,31 @@ MACRO secret_share(P1(x), P2()) AS
   SEND s1 TO P2
 ENDMACRO
 
-MACRO and_beaver(P1(x2, y2, a1, b1, c1), P2(x1, y1, a2, b2, c2)) AS
+MACRO and_beaver(P1(x2, y2), P2(x1, y1)) AS
+  -- generate beaver triple
+  {a1_defs}
+  a1 = {a1}
+  {a2_defs}
+  a2 = {a2}
+  {b1_defs}
+  b1 = {b1}
+  {b2_defs}
+  b2 = {b2}
+  {c1_defs}
+  c1 = {c1}
+
+  c2 = ((a1 ^ a2) & (b1 ^ b2)) ^ c1
+
+  -- deal shares of beaver triple
+  SEND a1 TO P1
+  SEND b1 TO P1
+  SEND c1 TO P1
+
+  SEND a2 TO P2
+  SEND b2 TO P2
+  SEND c2 TO P2
+
+  -- use beaver triple to evaluate the gate
   d1 = x2 + a1
   d2 = x1 + a2
   SEND d1 TO P2
