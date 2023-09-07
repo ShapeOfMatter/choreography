@@ -55,7 +55,7 @@ def gen_adder(xs, ys):
         else:
             carry = gen_xor(carry3, carry)
 
-    return outs
+    return outs, carry
 
 header = """
 MACRO secret_share(P1(x), P2()) AS
@@ -103,13 +103,18 @@ for yi in ys:
 
 emit()
 emit('-- Adder circuit')
-outs = gen_adder(xs, ys)
+outs, carry = gen_adder(xs, ys)
 
 emit()
 emit('-- Reveal output')
 rs = [f'r{i}' for i in range(BITS)]
-for o, r in zip(outs, rs):
+for i, (o, r) in enumerate(zip(outs, rs)):
+    emit(f'-- output {i}')
     emit(f'DO reveal(P1({o}_1), P2({o}_2)) GET({r}=y)')
     emit(f'OUTPUT {r}')
+
+emit('-- final carry')
+emit(f'DO reveal(P1({carry}_1), P2({carry}_2)) GET({r}=y)')
+emit(f'OUTPUT {r}')
 
 f.close()
