@@ -69,7 +69,9 @@ def run_iter(features1, features2, labels):
     score1 = np.linalg.norm(p1 - labels_test, ord=1, axis=1).sum() / len(p1)
     score2 = np.linalg.norm(p2 - labels_test, ord=1, axis=1).sum() / len(p1)
 
-    return (score1, score2)
+    epsilon = 1e-10
+
+    return (score1+epsilon, score2)
 
 try:
     results = Parallel(n_jobs=CORES)(delayed(run_iter)(f1, f2, l)
