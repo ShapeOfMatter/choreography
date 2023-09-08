@@ -99,9 +99,39 @@ What our tool actually invalidates is that the views are uniformly random within
 
 ## The tool in practice
 
+[How weedy do we want to get here?]
+
 ### A Choreography Language
 
+Our python script for actually performing the test consumes a stream of fixed-length bit vectors.
+(In practice, this is a CSV. Annotation of which columns are available in the real and ideal worlds is provided in the header.)
+[Does our tool strictly need the vectors to be fixed width? Could someone do this kind of test on a system with branching control flow?]
+To facilitate analysis of the tool, we implemented a choreographic programming language, CHO,
+with surrounding tooling to support large batches of parallel evaluations of a single program and piping of the generated data.
+The design of CHO is driven by the contextual assumptions of MPC security.
+[Do we want a BNF? Semantics?]
+In addition to bit-level computations and transmission of single bits between arbitrary parties,
+each party has its own read-only tape for secret inputs and random bits
+(CHO is also a probabilistic language),
+and its own tape for output bits.
+CHO supports macros, but they are extremely limited.
+Finally, CHO supports 1-of-N oblivious transfer as a primitive operation.
+This allows us to test (correct and incorrect) implementations of the classic GMW protocol.
+
 ### Random generation of programs
+
+The goal of this work is a tool that can detect mistakes in MPC protocols.
+Such a tools is only useful if there if new protocols and implementations are being written.
+Therefore, while it is critical to demonstrate that our tool can detect errors manually edite into known-secure protocols,
+we _also_ need to show that the tool can detect a lack of security in entirely novel and maximally diverse protocols.
+We attempt to show this by randomly generating hundreds [can we say thousands?] of protocols and testing them with different test parameters.
+
+The probability that a randomly generated protocol will be MPC secure is not completely negligible.
+As an easy example, if no communicated values ever depend on secret inputs, then the protocol meets the definition of security!
+(Never mind that such a protocol is useless; _none_ of the protocols we generated are _useful_.)
+That said, for reasonable generator settings we find that _very few_ generated protocols continue to appear secure as we increase the power of the test.
+
+[Probably a lot of the details of the generator go in the appendix?]
 
 ### Performance analysis
 
