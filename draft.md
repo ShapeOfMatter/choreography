@@ -72,15 +72,25 @@ and partly a judgment call about what kinds of systems will be best able to disc
 Generating the data for these tests requires running the protocol many times.
 The process is enumerated in Algorithm 1.
 
+Note that the data must be understood as vectors/matricies/tensors of bits. [is this actually important? are there exceptions/precondidtions?]
+
 > **Algorithm 1**
 >
 > 1. Set a chosen number of iterations `iters`,
 >    number of rows of data on which to train each model `trainN`,
->    and number of rows of data on which to test each model `testN`,
-> 2. For `i <- [1..iters]`, calculate scores for the real and ideal models:
->    - Run the protocol `trainN` times, collecting the corrupt views and honest secrets.
->    - Train the first ML model on the collected data. The views are the input features, and the honest secrets are the labels. [I think this is generic ML terminology?]
->    - Train the second ML model the same way, but occlude (omit or overwrite) view data t
+>    and number of rows of data on which to test each model `testN`.
+> 2. Choose $\alpha$, your probability of randomly flagging a secure protocol as insecure.
+> 3. For `i <- [1..iters]`, calculate scores for the real and ideal models:
+>    1. Run the protocol `trainN` times, collecting the corrupt views and honest secrets.
+>    2. Train the first ML model on the collected data.
+        The real-world views are the input features, and the honest secrets are the labels. [I think this is generic ML terminology?]
+>    3. Train the second ML model the same way, but occlude (omit or overwrite) view data to only reveal the ideal-world view.
+>    4. Run the protocol `testN` more times, again collecting the relevant data.
+>    5. The score for each model is the $L^1$ distance between the testing labels and the respective model outputs
+        (_i.e._ the number of bits wrong when run on the `testN` rows of test data).
+> 4. Using the `iters` samples of "real-world" and "ideal-world" scores,
+     calculate the $p$-value for the hypothesis that the distribution of real-world scores is better on average than the ideal-world distribution.
+     If this is significant ($p \leq \alpha$), output `INSECURE`, otherwise output `SECURE`.
 
 ### Issue: false positives
 
