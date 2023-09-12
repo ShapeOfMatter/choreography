@@ -86,6 +86,7 @@ main = do args <- getArgs
           let fileNames = [(i <= save, destination ++ "/" ++ runName ++ show i ++ ".cho")
                            | i :: Natural <- [1..totalGenerated]]
           let writeLog = appendFile $ destination ++ "/" ++ runName ++ "log.txt"
+          writeLog $ show settings ++ "\n"
           results <- catMaybes <$> mapM (blindDetermination writeLog . uncurry (attempt writeLog settings)) fileNames
           writeSankey (destination ++ "/" ++ runName ++ ".sankey.txt")
             . sankey (`indicatesSecurityBy` alpha)

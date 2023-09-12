@@ -2,7 +2,11 @@ from argparse import (ArgumentParser, FileType)
 from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
-from scipy.stats import ttest_ind
+from scipy.stats import (
+        #ttest_ind,
+        #ttest_rel,
+        wilcoxon
+        )
 from sklearn import tree
 from sklearn.multioutput import ClassifierChain
 from sys import (exit, stderr)
@@ -12,11 +16,13 @@ argp.add_argument("file", type=FileType('r', 1, encoding='utf_8', errors='strict
 argp.add_argument("iterations", type=int)
 argp.add_argument("trainingN", type=int)
 argp.add_argument("testingN", type=int)
+argp.add_argument("--pad", "-p", action="store_true", help="Pad the ideal-world views with random noise to match the dimensions of the real-world views.")
 args = argp.parse_args()
 
 NUM_ITERS = args.iterations
 NUM_TRAIN = args.trainingN
 PER_ITER = NUM_TRAIN + args.testingN
+PAD_VIEWS = args.pad
 
 try:
     with open("./cores") as cores_file:
@@ -42,12 +48,13 @@ for c in df.columns:
     elif c.startswith('h_'): honest_cols.append(c)
     else: raise Exception('unknown column type', c)
 
-features1 = df[ideal_cols].to_numpy()
+features1_raw = df[ideal_cols].to_numpy()
 features2 = df[ideal_cols + view_cols].to_numpy()
 
-padding = np.random.randint(0, 2, (features1.shape[0], features2.shape[1] - features1.shape[1]))
-features1_padded = np.hstack([features1, padding])
-features1 = features1_padded
+features1 = np.hstack([ features1_raw,
+                        np.random.randint(0, 2, (features1_raw.shape[0], features2.shape[1] - features1_raw.shape[1]))
+                     ]) if PAD_VIEWS else features1_raw
+
 labels = df[honest_cols].to_numpy()
 
 def run_iter(features1, features2, labels):
@@ -71,7 +78,7 @@ def run_iter(features1, features2, labels):
 
     epsilon = 1e-10
 
-    return (score1+epsilon, score2)
+    return (score1+epsilon, score2+epsilon)
 
 try:
     results = Parallel(n_jobs=CORES)(delayed(run_iter)(f1, f2, l)
@@ -85,7 +92,11 @@ except Exception as e:
 
 r = np.array(results)
 # print(r)
-statistics = ttest_ind(r[:,0], r[:,1], alternative='greater')
+statistics = wilcoxon(r[:,0], r[:,1],
+                      alternative='greater',
+                      zero_method='zsplit'
+                     )  # There are various options to this func to explore,
+                        # and I'm not sure we wouldn't be better off with `ttest_rel`.
 # print('T-test result:', )
 print(statistics.pvalue)
 
