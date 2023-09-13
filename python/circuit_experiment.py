@@ -15,8 +15,10 @@ def run_experiment(cho_file, iters, train, test, results_filename):
     train = str(train)
     test = str(test)
 
+    cho_filename = 'circuits/' + cho_file
+
     p1 = subprocess.Popen(['/usr/bin/time', '-f', '\'%e\'', 'cabal', 'exec', 'd-tree-data', '--',
-                           iters, train, test, '-f', cho_file],
+                           iters, train, test, '-f', cho_filename],
                           stdout=data_csv, stderr=stderr_log)
     p1.wait()
 
@@ -46,7 +48,8 @@ def run_experiment(cho_file, iters, train, test, results_filename):
         d_tree_time = float(f.read().replace('\'', ''))
 
     with open(results_filename, 'a') as f:
-        line = f'{iters},{train},{test},{pval},{data_time},{d_tree_time}\n'
+        line = f'{cho_file},{iters},{train},{test},{pval},{data_time},{d_tree_time}\n'
+        print(line)
         f.write(line)
 
 
@@ -71,15 +74,19 @@ cho_names = [
 'sha256_beaver.cho',
 'sha256_gmw.cho']
 
+dt_string = now.strftime("%d-%m-%Y_%H:%M:%S")
+filename = f'results/circuit_results_{dt_string}.csv'
+with open(filename, 'w') as f:
+    f.write('circuit,iters,train_size,test_size,pval,data_time,d_tree_time\n')
+
+TRIALS = 3
+
 for cho_name in cho_names:
     print('Running on:', cho_name)
-    dt_string = now.strftime("%d-%m-%Y_%H:%M:%S")
-    filename = f'results/circuit_results_{cho_name}_{dt_string}.csv'
-    with open(filename, 'w') as f:
-        f.write('iters,train_size,test_size,pval,data_time,d_tree_time\n')
 
-    for iters in iters:
+    for i in iters:
         for train in trains:
-            print(iters, train, int(train/2))
+            for _ in range(TRIALS):
+                #print(i, train, int(train/2))
 
-            run_experiment('circuits/' + cho_name, iters, train, int(train/2), filename)
+                run_experiment(cho_name, i, train, int(train/2), filename)
