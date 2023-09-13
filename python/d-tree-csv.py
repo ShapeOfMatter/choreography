@@ -10,6 +10,7 @@ from scipy.stats import (
 from sklearn import tree
 from sklearn.multioutput import ClassifierChain
 from sys import (exit, stderr)
+from warnings import catch_warnings, filterwarnings
 
 argp = ArgumentParser(description="Run the decision tree test on a csv of data.")
 argp.add_argument("file", type=FileType('r', 1, encoding='utf_8', errors='strict'))
@@ -91,12 +92,24 @@ except Exception as e:
     raise e
 
 r = np.array(results)
-# print(r)
-statistics = wilcoxon(r[:,0], r[:,1],
-                      alternative='greater',
-                      zero_method='zsplit'
-                     )  # There are various options to this func to explore,
-                        # and I'm not sure we wouldn't be better off with `ttest_rel`.
-# print('T-test result:', )
-print(statistics.pvalue)
+
+def statistical_test(a, b) -> float:
+    with catch_warnings():
+        # If your testingN is less than 10, you're doing it wrong anyway...
+        filterwarnings("ignore", message="Sample size too small for normal approximation", category=UserWarning)
+        try:
+            return wilcoxon(a, b,
+                            alternative='greater',
+                            zero_method='wilcox',
+                            method='approx',
+                            correction=True
+                            ).pvalue
+        except ValueError as ve:
+            message, *_ = ve.args
+            if message == "zero_method 'wilcox' and 'pratt' do not work if x - y is zero for all elements.":
+                return 1  # If all the differences are zero, then we have zero evidence of insecurity.
+            else:
+                raise ve
+
+print(statistical_test(r[:,0], r[:,1]))
 
