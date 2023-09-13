@@ -63,15 +63,15 @@ cho_names = [
 'aes_128_gmw.cho',
 #'divide64_beaver.cho',
 'divide64_gmw.cho',
-'FP-add_beaver.cho',
+#'FP-add_beaver.cho',
 'FP-add_gmw.cho',
-'FP-div_beaver.cho',
+#'FP-div_beaver.cho',
 'FP-div_gmw.cho',
-'FP-mul_beaver.cho',
+#'FP-mul_beaver.cho',
 'FP-mul_gmw.cho',
-'mult64_beaver.cho',
+#'mult64_beaver.cho',
 'mult64_gmw.cho',
-'sha256_beaver.cho',
+#'sha256_beaver.cho',
 'sha256_gmw.cho']
 
 dt_string = now.strftime("%d-%m-%Y_%H:%M:%S")
