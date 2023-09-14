@@ -25,7 +25,7 @@ MACRO and_beaver(P1(x2, y2), P2(x1, y1)) AS
   
   c1 = f0
 
-  c2 = ((a1 ^ a2) & (b1 ^ b2)) ^ c1
+  c2 = ((a1 + a2) ^ (b1 + b2)) + c1
 
   -- deal shares of beaver triple
   SEND a1 TO P1
