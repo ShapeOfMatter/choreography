@@ -57,21 +57,21 @@ iters = [64, 128]
 trains = [2**i for i in range(7, 11)]
 
 cho_names = [
-#'adder64_beaver.cho',
+'adder64_beaver.cho',
 'adder64_gmw.cho',
-#'aes_128_beaver.cho',
+'aes_128_beaver.cho',
 'aes_128_gmw.cho',
-#'divide64_beaver.cho',
+'divide64_beaver.cho',
 'divide64_gmw.cho',
-#'FP-add_beaver.cho',
+'FP-add_beaver.cho',
 'FP-add_gmw.cho',
-#'FP-div_beaver.cho',
+'FP-div_beaver.cho',
 'FP-div_gmw.cho',
-#'FP-mul_beaver.cho',
+'FP-mul_beaver.cho',
 'FP-mul_gmw.cho',
-#'mult64_beaver.cho',
+'mult64_beaver.cho',
 'mult64_gmw.cho',
-#'sha256_beaver.cho',
+'sha256_beaver.cho',
 'sha256_gmw.cho']
 
 dt_string = now.strftime("%d-%m-%Y_%H:%M:%S")
