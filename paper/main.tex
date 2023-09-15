@@ -23,20 +23,28 @@
 
 \newtheorem{definition}{Definition}
 
-\ExplSyntaxOn  %% for e.g. macro
-
-\newcommand { \eg }  %% https://tex.stackexchange.com/a/639374/244649
-{ \textit{e.g.}
-  \peek_meaning_ignore_spaces:NTF .
-    { \skip_horizontal:n { -.3ex } \use_none:n }
-    { \peek_meaning_ignore_spaces:NF , { \skip_horizontal:n { -.3ex } } }
-}
+\ExplSyntaxOn    %% https://tex.stackexchange.com/a/639374/244649
 \newcommand { \ie }
-{ \textit{i.e.}
-  \peek_meaning_ignore_spaces:NTF .
-    { \skip_horizontal:n { -.3ex } \use_none:n }
-    { \peek_meaning_ignore_spaces:NF , { \skip_horizontal:n { -.3ex } } }
-}
+  {
+    \textit{i.e.}
+    \peek_meaning_ignore_spaces:NTF .
+      { \skip_horizontal:n { -.3ex } \use_none:n }
+      {
+        \peek_meaning_ignore_spaces:NF ,
+          { \skip_horizontal:n { -.3ex } }
+      }
+  }
+\newcommand { \eg }
+  {
+    \textit{e.g.}
+    \peek_meaning_ignore_spaces:NTF .
+      { \skip_horizontal:n { -.3ex } \use_none:n }
+      {
+        \peek_meaning_ignore_spaces:NF ,
+          { \skip_horizontal:n { -.3ex } }
+      }
+  }
+\ExplSyntaxOff
 
 \newcommand{\termOfArt}[1]{\textbf{#1}}
 
@@ -53,11 +61,11 @@
 
 \subsection{Motivation}
 
-  As in all kinds of engineering; in cryptography it is critical to know that the thing you are building actually does what you intend.
-  In cryptography however, the intended behavior is often expressed as a negation,
-  \eg secret information should \textit{never} be derivable from such'n'such surface of the system.
-  Observing of the system's behavior provides limited evidence that the system is actually secure in the intended ways.
-  Formal proofs of security are a popular and well-suited solution to this problem, however:
+As in all kinds of engineering; in cryptography it is critical to know that the thing you are building actually does what you intend.
+In cryptography however, the intended behavior is often expressed as a negation,
+\eg secret information should \textit{never} be derivable from such'n'such surface of the system.
+Observing of the system's behavior provides limited evidence that the system is actually secure in the intended ways.
+Formal proofs of security are a popular and well-suited solution to this problem, however:
 
 \begin{itemize}
     \item As consumers, we are concerned that a great deal of cyber-security software has been and is being produced without formal verification.
