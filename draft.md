@@ -124,6 +124,11 @@ any protocol which is not _passive secure_ is automatically not _active secure_.
  review of stuff we tried that didn't work...
  ]
 
+[ computer proofs of MPC paper; (double-check malicions case...)
+  l-obliv
+  wysteria et al
+  probabilistic separation logic]
+
 ### Inference in PPLs
 
 ### Property-based testing
