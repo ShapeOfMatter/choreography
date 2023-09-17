@@ -1,13 +1,26 @@
 from circuit_generator import gensym, emit, gen_circuit, gen_randomness
 import random
+from argparse import (ArgumentParser, FileType)
+
+argp = ArgumentParser(description="Run the decision tree test on a csv of data.")
+argp.add_argument("input_file", type=FileType('r', 1, encoding='utf_8', errors='strict'))
+argp.add_argument("output_file", type=FileType('w', 1, encoding='utf_8', errors='strict'))
+argp.add_argument("--bias_sharing", action="store", type=int, default=0,
+                  help="Bias randomness used in secret sharing")
+argp.add_argument("--bias_and", action="store", type=int, default=0,
+                  help="Bias randomness used for AND gates")
+argp.add_argument("--accidental_secret", action="store", type=float, default=0.0,
+                  help="Rate of accidentally sending secret inputs to corrupt party")
+argp.add_argument("--accidental_gate", action="store", type=float, default=0.0,
+                  help="Rate of accidentally sending shares of gate outputs to corrupt party")
+args = argp.parse_args()
 
 config = {
-    'bias_sharing': 0,
-    'bias_and': 0,
-    'accidental_secret': 0.0,
-    'accidental_gate': 1.0,
+    'bias_sharing': args.bias_sharing,
+    'bias_and': args.bias_and,
+    'accidental_secret': args.accidental_secret,
+    'accidental_gate': args.accidental_gate,
     }
-
 
 def gen_xor(a, b):
     out = gensym('g')
@@ -62,4 +75,4 @@ MACRO reveal(P1(x1), P2(x2)) AS
 ENDMACRO
 """
 
-gen_circuit(config, generators, header)
+gen_circuit(config, generators, header, args.input_file, args.output_file)

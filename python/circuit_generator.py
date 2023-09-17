@@ -18,18 +18,12 @@ global_f = None
 def emit(s=''):
     global_f.write(s + '\n')
 
-def gen_circuit(config, generators, header):
+def gen_circuit(config, generators, header, circuit_file, output_file):
     global global_f
-    assert len(sys.argv) == 3
 
-    circuit_filename = sys.argv[1]
-    output_filename = sys.argv[2]
+    global_f = output_file
 
-    global_f = open(output_filename, "w")
-
-    with open(circuit_filename, "r") as c:
-        circuit_lines = c.readlines()
-
+    circuit_lines = circuit_file.readlines()
 
     num_gates, num_wires = [int(x) for x in circuit_lines[0].strip().split(' ')]
     inputs_line = circuit_lines[1].strip().split(' ')
