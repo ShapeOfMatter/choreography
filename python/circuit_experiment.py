@@ -66,7 +66,7 @@ def run_experiment(cho_filename, iters, train, test, results_filename,
 
 
 iters = [64, 128]
-trains = [2**i for i in range(7, 11)]
+trains = [2**i for i in range(7, 10)]
 
 circuit_names = [
     'adder64.txt',
