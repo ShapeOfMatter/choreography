@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 
 from datetime import datetime
 
@@ -69,14 +70,16 @@ iters = [64, 128]
 trains = [2**i for i in range(7, 10)]
 
 circuit_names = [
-    'adder64.txt',
-    'mult64.txt',
-    'aes_128.txt',
-    'divide64.txt',
-    'FP-add.txt',
-    'FP-mul.txt',
-    'sha256.txt',
-    'FP-div.txt']
+        cn
+        for cn in ['adder64.txt',
+                   'mult64.txt',
+                   'aes_128.txt',
+                   'divide64.txt',
+                   'FP-add.txt',
+                   'FP-mul.txt',
+                   'sha256.txt',
+                   'FP-div.txt']
+        if cn in sys.argv]
 
 protocol_types = ['gmw', 'beaver']
 
