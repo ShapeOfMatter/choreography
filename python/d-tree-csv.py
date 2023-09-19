@@ -13,7 +13,8 @@ from sys import (exit, stderr)
 from warnings import catch_warnings, filterwarnings
 
 argp = ArgumentParser(description="Run the decision tree test on a csv of data.")
-argp.add_argument("file", type=FileType('r', 1, encoding='utf_8', errors='strict'))
+#argp.add_argument("file", type=FileType('r', 1, encoding='utf_8', errors='strict'))
+argp.add_argument('file', type=FileType('r', 1, encoding='utf_8', errors='strict'), nargs='+')
 argp.add_argument("iterations", type=int)
 argp.add_argument("trainingN", type=int)
 argp.add_argument("testingN", type=int)
@@ -33,7 +34,7 @@ except FileNotFoundError:
 except ValueError:
     exit(f"{__file__} was unable to parse \"./cores\" as an integer.")
 
-df = pd.read_csv(args.file)
+df = pd.concat([pd.read_csv(f) for f in args.file])
 
 if len(df) != NUM_ITERS * PER_ITER:
     print(f"Using {PER_ITER} rows for {NUM_ITERS} iterations, but there are {len(df)} rows!",
