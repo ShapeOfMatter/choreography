@@ -1,10 +1,21 @@
 import os
 import subprocess
 import sys
+import math
 
 from datetime import datetime
 
 now = datetime.now()
+
+try:
+    with open("./cores") as cores_file:
+        CORES = int(cores_file.read())
+except FileNotFoundError:
+    exit(f"{__file__} was unable to find a file named \"./cores\" to tell it how many machine cores to use.")
+except ValueError:
+    exit(f"{__file__} was unable to parse \"./cores\" as an integer.")
+
+assert math.log(CORES, 2).is_integer()
 
 def gen_circuit_file(circuit_file, cho_file, protocol_type, config):
     bias_sharing, bias_and, accidental_secret, accidental_gate = config
@@ -22,31 +33,39 @@ def gen_circuit_file(circuit_file, cho_file, protocol_type, config):
 def run_experiment(cho_filename, iters, train, test, results_filename,
                    protocol_type, config, circuit_name):
     # generate data
-    data_csv = open('data.csv', "w")
-    stderr_log = open('stderr.log', "w")
-
+    iters_per_core = int(iters) // CORES
+    iters_per_core = str(iters_per_core)
     iters = str(iters)
     train = str(train)
     test = str(test)
 
-    p1 = subprocess.Popen(['/usr/bin/time', '-f', '\'%e\'', 'cabal', 'exec', 'd-tree-data', '--',
-                           iters, train, test, '-f', cho_filename],
-                          stdout=data_csv, stderr=stderr_log)
-    p1.wait()
+    pids = []
+    for i in range(CORES):
+        data_csv = open(f'data{i}.csv', "w")
+        stderr_log = open(f'stderr{i}.log', "w")
 
-    stderr_log.close()
-    data_csv.close()
+        p1 = subprocess.Popen(['/usr/bin/time', '-f', '\'%e\'', 'cabal', 'exec', 'd-tree-data', '--',
+                            iters_per_core, train, test, '-f', cho_filename],
+                            stdout=data_csv, stderr=stderr_log)
+        pids.append((p1, data_csv, stderr_log))
 
-    with open('stderr.log', "r") as f:
+    for pid, data_csv, stderr_log in pids:
+        pid.wait()
+        stderr_log.close()
+        data_csv.close()
+
+    with open('stderr0.log', "r") as f:
         data_time = float(f.read().replace('\'', ''))
 
     # run d-trees
     stdout_log = open('stdout.log', "w")
     stderr_log = open('stderr.log', "w")
 
-    p2 = subprocess.Popen(['/usr/bin/time', '-f', '\'%e\'', 'python', '--',
-                           'python/d-tree-csv.py', 'data.csv',
-                           iters, train, test],
+    data_files = [f'data{i}.csv' for i in range(CORES)]
+    proc_spec = ['/usr/bin/time', '-f', '\'%e\'', 'python', '--',
+                 'python/d-tree-csv.py'] + data_files + \
+                [iters, train, test]
+    p2 = subprocess.Popen(proc_spec,
                           stdout=stdout_log, stderr=stderr_log)
     p2.wait()
 
