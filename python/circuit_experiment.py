@@ -54,8 +54,11 @@ def run_experiment(cho_filename, iters, train, test, results_filename,
         stderr_log.close()
         data_csv.close()
 
-    with open('stderr0.log', "r") as f:
-        data_time = float(f.read().replace('\'', ''))
+    def retrieve_time(i):
+        with open(f'stderr{i}.log', "r") as f:
+            return float(f.read().replace('\'', ''))
+
+    data_time = max(retrieve_time(i) for i in range(CORES))
 
     # run d-trees
     stdout_log = open('stdout.log', "w")
