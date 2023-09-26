@@ -287,6 +287,54 @@ continue to appear secure as we increase the power of the test.
 \subsection{Performance analysis}
 
 
+\section{Evaluation}
+
+\subsection{Secure Protocols Evaluated}
+
+
+\begin{table}
+\centering
+  \begin{tabular}{|l | l|l|}
+    \hline
+    \textbf{Protocol} & \textbf{Purpose} & \textbf{Ref.} \\
+    \hline
+    $n$-bit Addition & Custom & TODO \\
+    Oblivious Transfer & Building block & TODO \\
+    OT Extension & Building block & TODO \\
+    Beaver Triple Generation & Building block & TODO \\
+    GMW & Circuit evaluation & TODO \\
+    MPC w/ Beaver Triples & Circuit evaluation & TODO \\
+    \hline
+  \end{tabular}
+  \caption{Secure protocols used in our evaluation.}
+\end{table}
+
+\begin{table}
+\centering
+  \begin{tabular}{|l |l|l|}
+    \hline
+    \textbf{Circuit} & \textbf{AND Gates} & \textbf{Total Gates} \\
+    \hline
+    64-bit adder & 63 & 376 \\
+    64-bit multiplier & 4,033 & 13,675 \\
+    AES-128 & 6,400 & 36,663 \\
+    SHA-256 & 22,573 & 135,073 \\
+    Floating-point division & 82,269 & 184,007 \\
+    \hline
+  \end{tabular}
+  \caption{Circuits used in our evaluation.}
+\end{table}
+
+
+\subsection{Experiment 1: Scalability for Secure Protocols}
+
+
+
+\subsection{Experiment 2: Bug-Finding for Insecure Protocol Mutations}
+
+\subsection{Experiment 3: Scalability and Bug-Finding for Random Programs}
+
+
 \section{Future Work}
 
 
