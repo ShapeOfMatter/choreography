@@ -115,17 +115,22 @@ by observing the execution of Π.
 As an example, this notion of security might be of interest if Alice trusted Bob to participate
 in a distributed computation with her, but did not trust him to properly store or destroy the log-files
 generated.
-The \termOfArt{ideal world view} of a party is what it sees in the ideal world: just its inputs and outputs.
-The \termOfArt{real world view} of a party is everything it sees in the real world while executing its part of Π:
+The \termOfArt{ideal world view}, $\mathsf{Ideal}_P(F,\vec{x})$, of a party P is what it sees when running F in the ideal world:
+just its inputs $\vec{x}_P$ and its outputs.
+The \termOfArt{real world view}, $\mathsf{Real}_P(Π, \vec{x})$, of a party P is everything it sees while executing its part of Π in the real world:
 its inputs, outputs, all messages it receives, and all the bits of random tape it uses.
+Both these concepts extend to naturally to lists of parties.
 
 \begin{definition}[Passive MPC Security]
-A protocol Π,
-involving participating parties P,
-that correctly implements functionality F,
-is secure against a passive adversary controlling C$\subset$P iff
-there exists a poly-time-computable function SIM s.t.
-....
+    A protocol Π,
+    involving participating parties P,
+    that correctly implements functionality F,
+    is secure against a passive adversary controlling C$\subset$P iff
+    there exists a poly-time-computable function $\mathtt{SIM}$ s.t.
+    $$\begin{aligned}
+        \mathsf{Real}_C(Π, \vec{x}) &\cong \mathtt{SIM}(\mathsf{Ideal}_C(F,\vec{x}))
+    \end{aligned}$$
+    where $\cong$ denotes distributional equivelence or indistinguishabilty.
 \end{definition}
 
 This definition represents security by a transitive argument:
