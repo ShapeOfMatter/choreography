@@ -93,6 +93,13 @@ def gen_circuit(config, generators, header, circuit_file, output_file):
             out_name = gen_inv(wire_names[int(in1)])
             wire_names[int(out)] = out_name
 
+        elif gate_type == 'EQW':
+            inputs, outputs, in1, out, t = gate_params
+            out_name = gensym('g') #gen_inv(wire_names[int(in1)])
+            emit(f'{out_name}_1 = {in1}_1')
+            emit(f'{out_name}_2 = {in1}_2')
+            wire_names[int(out)] = out_name
+
         elif gate_type == 'XOR':
             inputs, outputs, in1, in2, out, t = gate_params
             out_name = gen_xor(wire_names[int(in1)],
