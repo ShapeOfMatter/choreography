@@ -33,7 +33,7 @@ def gen_xor(a, b):
 def gen_inv(a):
     out = gensym('g')
     emit(f'{out}_1 = {a}_1 + 1')
-    emit(f'{out}_2 = {a}_2 + 1')
+    emit(f'{out}_2 = {a}_2')
     if random.random() < config['accidental_gate']:
         emit(f'SEND {out}_2 TO P1 -- accidental send to corrupt')
     return out
