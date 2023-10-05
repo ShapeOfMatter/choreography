@@ -84,6 +84,7 @@ def gen_circuit(config, generators, header, circuit_file, output_file):
     gen_xor = generators['XOR']
     gen_and = generators['AND']
     gen_inv = generators['INV']
+
     for gl in gate_lines:
         gate_params = gl.strip().split(' ')
         gate_type = gate_params[-1]
@@ -95,9 +96,10 @@ def gen_circuit(config, generators, header, circuit_file, output_file):
 
         elif gate_type == 'EQW':
             inputs, outputs, in1, out, t = gate_params
+            in_name = wire_names[int(in1)]
             out_name = gensym('g') #gen_inv(wire_names[int(in1)])
-            emit(f'{out_name}_1 = {in1}_1')
-            emit(f'{out_name}_2 = {in1}_2')
+            emit(f'{out_name}_1 = {in_name}_1')
+            emit(f'{out_name}_2 = {in_name}_2')
             wire_names[int(out)] = out_name
 
         elif gate_type == 'XOR':
