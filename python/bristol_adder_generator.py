@@ -69,9 +69,9 @@ for outv in outs:
     emit(f'1 1 {outv} {w} EQW')
     output_wires.append(w)
 
-w = next_wire()
-output_wires.append(w)
-emit(f'1 1 {carry} {w} EQW')
+# w = next_wire()
+# output_wires.append(w)
+# emit(f'1 1 {carry} {w} EQW')
 
 
 num_gates = f.getvalue().count('\n')
