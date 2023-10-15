@@ -11,8 +11,8 @@ argp.add_argument("--bias_and", action="store", type=int, default=0,
                   help="Bias randomness used for AND gates")
 argp.add_argument("--accidental_secret", action="store", type=float, default=0.0,
                   help="Rate of accidentally sending secret inputs to corrupt party")
-argp.add_argument("--accidental_gate", action="store", type=float, default=0.0,
-                  help="Rate of accidentally sending shares of gate outputs to corrupt party")
+argp.add_argument("--accidental_gate", action="store", type=int, default=0,
+                  help="Rate of accidentally sending shares of and-gate outputs to corrupt party")
 args = argp.parse_args()
 
 config = {
@@ -38,19 +38,14 @@ def gen_and(a, b):
     out = gensym('g')
 
     emit(f'DO and_beaver(P1({a}_1, {b}_1), P2({a}_2, {b}_2)) GET({out}_1=out1, {out}_2=out2)')
-    if random.random() < config['accidental_gate']:
-        emit(f'SEND {out}_2 TO P1 -- accidental send to corrupt')
     return out
 
 generators = {'AND': gen_and, 'XOR': gen_xor, 'INV': gen_inv}
 
 share_randomness_var, share_randomness_defs = gen_randomness(config['bias_sharing'], 'P1')
-a1, a1_defs = gen_randomness(config['bias_and'], 'P3')
-a2, a2_defs = gen_randomness(config['bias_and'], 'P3')
-b1, b1_defs = gen_randomness(config['bias_and'], 'P3')
-b2, b2_defs = gen_randomness(config['bias_and'], 'P3')
+# we only bias one of the dealer flips, to try to keep the scale of this break on par with the other implementation.
 c1, c1_defs = gen_randomness(config['bias_and'], 'P3')
-c2, c2_defs = gen_randomness(config['bias_and'], 'P3')
+and_leakage_var, and_leakage_defs = gen_randomness(config['accidental_gate'], 'P2', baseline=0)
 
 header = f"""
 MACRO secret_share(P1(x), P2()) AS
@@ -62,14 +57,10 @@ ENDMACRO
 
 MACRO and_beaver(P1(x2, y2), P2(x1, y1)) AS
   -- generate beaver triple
-  {a1_defs}
-  a1 = {a1}
-  {a2_defs}
-  a2 = {a2}
-  {b1_defs}
-  b1 = {b1}
-  {b2_defs}
-  b2 = {b2}
+  a1 = FLIP @P3
+  a2 = FLIP @P3
+  b1 = FLIP @P3
+  b2 = FLIP @P3
   {c1_defs}
   c1 = {c1}
 
@@ -97,7 +88,11 @@ MACRO and_beaver(P1(x2, y2), P2(x1, y1)) AS
   e = e1 + e2
 
   out1 = (d ^ e) + (d ^ b1) + (e ^ a1) + c1
-  out2 = (d ^ e) + (d ^ b2) + (e ^ a2) + c2
+  out2 = (d ^ e) y or have a sp+ (d ^ b2) + (e ^ a2) + c2
+
+  {and_leakage_defs}
+  leakage = out2 ^(~({and_leakage_var}))
+  SEND leakage TO P1
 ENDMACRO
 
 MACRO reveal(P1(x1), P2(x2)) AS

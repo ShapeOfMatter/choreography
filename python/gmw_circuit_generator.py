@@ -11,8 +11,8 @@ argp.add_argument("--bias_and", action="store", type=int, default=0,
                   help="Bias randomness used for AND gates")
 argp.add_argument("--accidental_secret", action="store", type=float, default=0.0,
                   help="Rate of accidentally sending secret inputs to corrupt party")
-argp.add_argument("--accidental_gate", action="store", type=float, default=0.0,
-                  help="Rate of accidentally sending shares of gate outputs to corrupt party")
+argp.add_argument("--accidental_gate", action="store", type=int, default=0,
+                  help="Rate of accidentally sending shares of and-gate outputs to corrupt party")
 args = argp.parse_args()
 
 config = {
@@ -37,14 +37,13 @@ def gen_inv(a):
 def gen_and(a, b):
     out = gensym('g')
     emit(f'DO and_gmw(P1({a}_1, {b}_1), P2({a}_2, {b}_2)) GET({out}_1=out1, {out}_2=out2)')
-    if random.random() < config['accidental_gate']:
-        emit(f'SEND {out}_2 TO P1 -- accidental send to corrupt')
     return out
 
 generators = {'AND': gen_and, 'XOR': gen_xor, 'INV': gen_inv}
 
 share_randomness_var, share_randomness_defs = gen_randomness(config['bias_sharing'], 'P1')
 and_randomness_var, and_randomness_defs = gen_randomness(config['bias_and'], 'P2')
+and_leakage_var, and_leakage_defs = gen_randomness(config['accidental_gate'], 'P2', baseline=0)
 
 header = f"""
 MACRO secret_share(P1(x), P2()) AS
@@ -57,6 +56,9 @@ ENDMACRO
 MACRO and_gmw(P1(x2, y2), P2(x1, y1)) AS
   {and_randomness_defs}
   out2 = {and_randomness_var}
+  {and_leakage_defs}
+  leakage = out2 ^(~({and_leakage_var}))
+  SEND leakage TO P1
   g1_s2_00 = out2 + ((x1 + 0) ^ (y1 + 0))
   g1_s2_01 = out2 + ((x1 + 0) ^ (y1 + 1))
   g1_s2_10 = out2 + ((x1 + 1) ^ (y1 + 0))

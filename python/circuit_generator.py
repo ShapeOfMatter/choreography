@@ -1,11 +1,12 @@
 import random
 import sys
 
-def gen_randomness(bias_level, party):
+def gen_randomness(bias_level, party, baseline=1):
     output = ""
-    for i in range(bias_level+1):
+    for i in range(bias_level + baseline):
         output += f'f{i} = FLIP @{party}\n  '
-    exp = ' ^ '.join([f'f{i}' for i in range(bias_level+1)])
+    exp = ' ^ '.join([f'f{i}' for i in range(bias_level + baseline)]) or ' 1 '
+    # if baseline=bias_level=0, then you'll always use the value 1 instead of anding together the (nonexistant) flips.
     return exp, output
 
 gn = 0
