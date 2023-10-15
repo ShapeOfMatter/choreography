@@ -141,8 +141,8 @@ This definition represents security by a transitive argument:
 Since the adversary in the ideal world can compute all the data the real-world adversary starts with,
 anything the real-world adversary can compute the ideal-world adversary can also compute!
 
-In practice, security is usually quantified over all possible corruptions C
-where |C|$\leq$|P|/x for some x, but this is not fundamental and we only consider a single C at a time.
+In practice, security is usually quantified over all possible corruptions $C$
+where $\lvert C \rvert \leq \frac{\lvert P \rvert}{x}$ for some $x$, but this is not fundamental and we only consider a single $C$ at a time.
 
 Definition 1 is tight, in the sense that attempting to relax it invariable either
 allows a "secure" protocol to do something bad, or requires introducing restrictions
@@ -150,7 +150,7 @@ on the kinds of functionality to which the definition may be applied.
 (Of course the idea that a secure protocol \textit{can't} do anything bad implies an assumption that computing
 the functionality is a good thing. [move to footnote])
 That said, some simplification is possible for our purposes:
-Since the corrupted parties are assumed to follow Π faithfully, we are fine to limit ourselves to
+Since the (passive) corrupted parties are assumed to follow Π faithfully, we are fine to limit ourselves to
 choreographic protocols in which all messages sent are expected and all messages expected are received.
 In this context, and because the only source of non-determinism is the parties' random tapes
 (which are captured in the real-world views),
@@ -175,6 +175,14 @@ The corresponding security definition is a bit more involved, and we omit it for
 Since we're not directly testing for active security in this work,
 all else that needs to be said about it is that
 any protocol which is not \termOfArt{passive secure} is automatically not \termOfArt{active secure}.
+
+Certain edge cases are helpful to consider, as they really do map out the edges of the problem of testing from MPC security.
+In the first case, Π itself may be vacuous.
+A protocol in which no information (random bits don't count) is communicated is automatically secure,
+although of course it can only correctly implement trivial functionalities.
+On the other hand, if the adversary can efficiently deduce a unique possible honest input upon observing the corrupt output,
+then the security is vacuous; any correct implementation of that functionality is secure regardless of what's communicated.
+
 
 [Other aspects we may wish to cover:
  vacuous protocols,
