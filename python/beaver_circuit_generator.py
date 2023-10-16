@@ -9,7 +9,7 @@ argp.add_argument("--bias_sharing", action="store", type=int, default=0,
                   help="Bias randomness used in secret sharing")
 argp.add_argument("--bias_and", action="store", type=int, default=0,
                   help="Bias randomness used for AND gates")
-argp.add_argument("--accidental_secret", action="store", type=float, default=0.0,
+argp.add_argument("--accidental_secret", action="store", type=int, default=0,
                   help="Rate of accidentally sending secret inputs to corrupt party")
 argp.add_argument("--accidental_gate", action="store", type=int, default=0,
                   help="Rate of accidentally sending shares of and-gate outputs to corrupt party")

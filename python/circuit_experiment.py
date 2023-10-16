@@ -18,8 +18,8 @@ launch_time = datetime.now()
 class SecurityConfiguration:
     bias_sharing : int = 0
     bias_and : int = 0
-    accidental_secret : float = 0
-    accidental_gate : float = 0
+    accidental_secret : int = 0
+    accidental_gate : int = 0
     def __str__(self):
         return f"{self.bias_sharing},{self.bias_and},{self.accidental_secret},{self.accidental_gate}"
 
@@ -98,8 +98,8 @@ configs = [
     SecurityConfiguration(), # secure
     *( SecurityConfiguration(bias_sharing      = i  ) for i in range(1, 4) ),  # for consistency i should make these args too, but it's a chore.
     *( SecurityConfiguration(bias_and          = i  ) for i in range(1, 4) ),
-    *( SecurityConfiguration(accidental_secret = 1/i) for i in range(2, 5) ),
-    *( SecurityConfiguration(accidental_gate   = 1/i) for i in range(2, 5) )
+    *( SecurityConfiguration(accidental_secret = i  ) for i in range(1, 4) ),
+    *( SecurityConfiguration(accidental_gate   = i  ) for i in range(1, 4) )
 ]
 log(configs)
 
@@ -114,8 +114,8 @@ def scrape_prior(csv_name):
                    int(row["test_size"]),
                    SecurityConfiguration(bias_sharing=int(row["bias_sharing"]),
                                          bias_and=int(row["bias_and"]),
-                                         accidental_secret=float(row["accidental_secret"]),
-                                         accidental_gate=float(row["accidental_gate"])))
+                                         accidental_secret=int(row["accidental_secret"]),
+                                         accidental_gate=int(row["accidental_gate"])))
 
 already_done = Counter(chain.from_iterable(scrape_prior(p) for p in args.pre_existing))
 log(already_done)

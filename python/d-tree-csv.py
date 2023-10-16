@@ -108,7 +108,7 @@ def statistical_test(a, b) -> float:
         except ValueError as ve:
             message, *_ = ve.args
             if message == "zero_method 'wilcox' and 'pratt' do not work if x - y is zero for all elements.":
-                return 1  # If all the differences are zero, then we have zero evidence of insecurity.
+                return 0.5  # If all the differences are zero, then we have zero evidence of insecurity.
             else:
                 raise ve
 
