@@ -58,8 +58,10 @@ def gen_circuit(config, generators, header, circuit_file, output_file):
     emit()
     for yi in ys:
         emit(f'{yi} = SECRET @P2')
-        if random.random() < config['accidental_secret']:
-            emit(f'SEND {yi} TO P1 -- accidental send secret to corrupt')
+        value, setup = gen_randomness(config['accidental_secret'], 'P2', baseline=0)
+        emit(setup)
+        emit(f'leak_{yi} = {yi} ^(~({value}))')
+        emit(f'SEND leak_{yi} TO P1 -- accidental send secret to corrupt')
 
     emit()
     emit('-- Set up shares')
