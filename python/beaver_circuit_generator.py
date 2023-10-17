@@ -88,7 +88,7 @@ MACRO and_beaver(P1(x2, y2), P2(x1, y1)) AS
   e = e1 + e2
 
   out1 = (d ^ e) + (d ^ b1) + (e ^ a1) + c1
-  out2 = (d ^ e) y or have a sp+ (d ^ b2) + (e ^ a2) + c2
+  out2 = (d ^ e) + (d ^ b2) + (e ^ a2) + c2
 
   {and_leakage_defs}
   leakage = out2 ^(~({and_leakage_var}))
