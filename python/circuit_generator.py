@@ -126,10 +126,10 @@ def gen_circuit(config, generators, header, circuit_file, output_file):
     output_names = [wire_names[k] for k in output_wires]
 
     emit()
-    emit('-- Reveal output')
-    rs = [f'r{i}' for i in range(len(output_names))]
-    for o, r in zip(output_names, rs):
-        emit(f'DO reveal(P1({o}_1), P2({o}_2)) GET({r}=y)')
-        emit(f'OUTPUT {r}')
+    # emit('-- Reveal output')
+    # rs = [f'r{i}' for i in range(len(output_names))]
+    # for o, r in zip(output_names, rs):
+    #     emit(f'DO reveal(P1({o}_1), P2({o}_2)) GET({r}=y)')
+    #     emit(f'OUTPUT {r}')
 
     global_f.close()
