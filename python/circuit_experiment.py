@@ -29,7 +29,7 @@ argp.add_argument('--output_file', "-o", type=str, default="results/circuit_resu
                   help="Path to the CSV file to write data to. Will be overwritten if it already exists."
                        +" The pattern \"\{t\}\" will be replaced with the current time.")
 argp.add_argument("--repititions", "-R", type=int, default=3, help="How many times to repeat each test on each circuit.")
-argp.add_argument("--cho-temp", type=str, default='tmp.cho', help="The temp-file to which to save the generated CHO protocol.")
+argp.add_argument("--temp-dir", type=str, default=".", help="A temp dir in which to stash data from child processes.")
 argp.add_argument("--pre-existing", "-P", type=str, action="extend", nargs="+", default=[],
                   help="CSV files containing data from prior runs, which can be skipped.")
 argp.add_argument("--log", type=FileType('w', 1, encoding='utf_8', errors='strict'), default="-", help="An extra log file to use instead of STD_OUT.")
@@ -85,7 +85,8 @@ circuit_names = args.circuits or ['adder_1.txt',
 protocol_types = args.protocols or ['gmw', 'beaver']
 filename = args.output_file.format(t=launch_time.strftime("%d-%m-%Y_%H:%M:%S"))
 TRIALS = args.repititions
-cho_file = args.cho_temp
+temp_dir = args.temp_dir
+cho_file = os.path.join(temp_dir, 'tmp.cho')
 configs = sorted(set(
     ImplementationDetails(**{f.name: v})
     for f in fields(ImplementationDetails)
@@ -150,8 +151,8 @@ def run_experiment(cho_filename, iters, train, test, results_filename,
 
     pids = []
     for i in range(CORES):
-        data_csv = open(f'data{i}.csv', "w")
-        stderr_log = open(f'stderr{i}.log', "w")
+        data_csv = open(os.path.join(temp_dir, f'data{i}.csv'), "w")
+        stderr_log = open(os.path.join(temp_dir, f'stderr{i}.log'), "w")
 
         p1 = subprocess.Popen(['/usr/bin/time', '-f', '\'%e\'', 'cabal', 'exec', 'd-tree-data', '--',
                             iters_per_core, train, test, '-f', cho_filename],
@@ -164,30 +165,27 @@ def run_experiment(cho_filename, iters, train, test, results_filename,
         data_csv.close()
 
     def retrieve_time(i):
-        with open(f'stderr{i}.log', "r") as f:
+        with open(os.path.join(temp_dir, f'stderr{i}.log'), "r") as f:
             return float(f.read().replace('\'', ''))
 
     data_time = max(retrieve_time(i) for i in range(CORES))
 
     # run d-trees
-    stdout_log = open('stdout.log', "w")
-    stderr_log = open('stderr.log', "w")
 
-    data_files = [f'data{i}.csv' for i in range(CORES)]
-    proc_spec = ['/usr/bin/time', '-f', '\'%e\'', 'python', '--',
-                 'python/d-tree-csv.py'] + data_files + \
-                [iters, train, test]
-    p2 = subprocess.Popen(proc_spec,
-                          stdout=stdout_log, stderr=stderr_log)
-    p2.wait()
+    with (open(os.path.join(temp_dir, 'stdout.log'), "w") as stdout_log,
+          open(os.path.join(temp_dir, 'stderr.log'), "w") as stderr_log):
+        data_files = [os.path.join(temp_dir, f'data{i}.csv') for i in range(CORES)]
+        proc_spec = ['/usr/bin/time', '-f', '\'%e\'', 'python', '--',
+                     'python/d-tree-csv.py'] + data_files + \
+                    [iters, train, test]
+        p2 = subprocess.Popen(proc_spec,
+                              stdout=stdout_log, stderr=stderr_log)
+        p2.wait()
 
-    stderr_log.close()
-    stdout_log.close()
-
-    with open('stdout.log', "r") as f:
+    with open(os.path.join(temp_dir, 'stdout.log'), "r") as f:
         pval = float(f.read().replace('\'', ''))
 
-    with open('stderr.log', "r") as f:
+    with open(os.path.join(temp_dir, 'stderr.log'), "r") as f:
         d_tree_time = float(f.read().replace('\'', ''))
 
     with open(results_filename, 'a') as f:
