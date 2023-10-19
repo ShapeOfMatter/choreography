@@ -29,6 +29,7 @@ argp.add_argument('--output_file', "-o", type=str, default="results/circuit_resu
                   help="Path to the CSV file to write data to. Will be overwritten if it already exists."
                        +" The pattern \"\{t\}\" will be replaced with the current time.")
 argp.add_argument("--repititions", "-R", type=int, default=3, help="How many times to repeat each test on each circuit.")
+argp.add_argument("--unpad", action="store_false", help="Don't pad the ideal-world views with random noise to match the dimensions of the real-world views.")
 argp.add_argument("--temp-dir", type=str, default=".", help="A temp dir in which to stash data from child processes.")
 argp.add_argument("--pre-existing", "-P", type=str, action="extend", nargs="+", default=[],
                   help="CSV files containing data from prior runs, which can be skipped.")
@@ -85,6 +86,7 @@ circuit_names = args.circuits or ['adder_1.txt',
 protocol_types = args.protocols or ['gmw', 'beaver']
 filename = args.output_file.format(t=launch_time.strftime("%d-%m-%Y_%H:%M:%S"))
 TRIALS = args.repititions
+pad_views = args.unpad
 temp_dir = args.temp_dir
 cho_file = os.path.join(temp_dir, 'tmp.cho')
 configs = sorted(set(
@@ -92,7 +94,7 @@ configs = sorted(set(
     for f in fields(ImplementationDetails)
     for v in vars(args)[f.name] or f.metadata['defaults']
 ))
-log((iters, trains, testing_ratio, circuit_names, protocol_types, filename, TRIALS, cho_file, configs))
+log((iters, trains, testing_ratio, pad_views, circuit_names, protocol_types, filename, TRIALS, cho_file, configs))
 
 
 def scrape_prior(csv_name):
@@ -177,7 +179,8 @@ def run_experiment(cho_filename, iters, train, test, results_filename,
         data_files = [os.path.join(temp_dir, f'data{i}.csv') for i in range(CORES)]
         proc_spec = ['/usr/bin/time', '-f', '\'%e\'', 'python', '--',
                      'python/d-tree-csv.py'] + data_files + \
-                    [iters, train, test]
+                    [iters, train, test] + \
+                    (["--pad"] if pad_views else [])
         p2 = subprocess.Popen(proc_spec,
                               stdout=stdout_log, stderr=stderr_log)
         p2.wait()
