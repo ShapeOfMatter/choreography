@@ -1,11 +1,11 @@
 import random
 import sys
 
-def gen_randomness(bias_level, party, baseline=1):
+def gen_randomness(bias_level, party, baseline=1, globalizer=''):
     output = ""
     for i in range(bias_level + baseline):
-        output += f'f{i} = FLIP @{party}\n  '
-    exp = ' ^ '.join([f'f{i}' for i in range(bias_level + baseline)]) or ' 1 '
+        output += f'f{globalizer}_{i} = FLIP @{party}\n  '
+    exp = ' ^ '.join([f'f{globalizer}_{i}' for i in range(bias_level + baseline)]) or ' 1 '
     # if baseline=bias_level=0, then you'll always use the value 1 instead of anding together the (nonexistant) flips.
     return exp, output
 
@@ -58,7 +58,7 @@ def gen_circuit(config, generators, header, circuit_file, output_file):
     emit()
     for yi in ys:
         emit(f'{yi} = SECRET @P2')
-        value, setup = gen_randomness(config.accidental_secret, 'P2', baseline=0)
+        value, setup = gen_randomness(config.accidental_secret, 'P2', baseline=0, globalizer=gensym(""))
         emit(setup)
         emit(f'leak_{yi} = {yi} ^(~({value}))')
         emit(f'SEND leak_{yi} TO P1 -- accidental send secret to corrupt')
