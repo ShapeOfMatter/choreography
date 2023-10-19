@@ -52,7 +52,7 @@ MACRO secret_share(P1(x), P2()) AS
   {share_randomness_defs}
   s1 = {share_randomness_var}
   s2 = x + s1
-  SEND s1 TO P2
+  SEND s2 TO P2
 ENDMACRO
 
 MACRO and_beaver(P1(x2, y2), P2(x1, y1)) AS

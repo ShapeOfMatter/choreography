@@ -66,11 +66,11 @@ def gen_circuit(config, generators, header, circuit_file, output_file):
     emit()
     emit('-- Set up shares')
     for xi in xs:
-        emit(f'DO secret_share(P1({xi}), P2()) GET({xi}_1=s2, {xi}_2=s1)')
+        emit(f'DO secret_share(P1({xi}), P2()) GET({xi}_1=s1, {xi}_2=s2)')
 
     emit()
     for yi in ys:
-        emit(f'DO secret_share(P2({yi}), P1()) GET({yi}_1=s1, {yi}_2=s2)')
+        emit(f'DO secret_share(P2({yi}), P1()) GET({yi}_1=s2, {yi}_2=s1)')
 
     ##################################################
     # Gates
