@@ -1,7 +1,7 @@
 from argparse import (ArgumentParser, FileType)
 from collections import Counter
 from csv import DictReader
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import datetime
 from itertools import chain
 import math
@@ -16,7 +16,7 @@ from cho_builder.core import ImplementationDetails
 launch_time = datetime.now()
 
 
-argp = ArgumentParser(description="Build various circuits and test them at various powers")
+argp = ArgumentParser(description="Build various circuits and test them at various powers. Note that the breakage options are not cross-product-ed; each breakage is done just once.")
 # We don't use `FileType` arguments because we don't want these handles open all the time.
 argp.add_argument("--iters", "-i", type=int, action="extend", nargs="+", help="Values of \"iterations\" at which to test the circuits.")
 argp.add_argument("--trains", "-t", type=int, action="extend", nargs="+", help="Values of \"training N\" at which to test the circuits.")
@@ -25,7 +25,7 @@ argp.add_argument("--testing-ratio", type=int, default=2,
 argp.add_argument("--circuits", "-c", type=str, action="extend", nargs="+", help="Circuit files to parse into CHO and then test."
                                                                                  +" A \"circuits/\" prefix will be added!")
 argp.add_argument("--protocols", "-p", type=str, action="extend", nargs="+", help="The protocols with which to implement each circuit.")
-argp.add_argument('--output', "-o", type=str, default="results/circuit_results_{t}.csv",
+argp.add_argument('--output_file', "-o", type=str, default="results/circuit_results_{t}.csv",
                   help="Path to the CSV file to write data to. Will be overwritten if it already exists."
                        +" The pattern \"\{t\}\" will be replaced with the current time.")
 argp.add_argument("--repititions", "-R", type=int, default=3, help="How many times to repeat each test on each circuit.")
@@ -33,6 +33,8 @@ argp.add_argument("--cho-temp", type=str, default='tmp.cho', help="The temp-file
 argp.add_argument("--pre-existing", "-P", type=str, action="extend", nargs="+", default=[],
                   help="CSV files containing data from prior runs, which can be skipped.")
 argp.add_argument("--log", type=FileType('w', 1, encoding='utf_8', errors='strict'), default="-", help="An extra log file to use instead of STD_OUT.")
+for f in fields(ImplementationDetails):
+    argp.add_argument(f"--{f.name}", action="extend", nargs="+", type=f.type, **{k:v for k,v in f.metadata.items() if k in ("help", "choices")})
 args = argp.parse_args()
 
 log = PrettyPrinter(width=120, stream=args.log).pprint
@@ -81,19 +83,16 @@ circuit_names = args.circuits or ['adder_1.txt',
                                   'sha256.txt',
                                   'FP-div.txt']
 protocol_types = args.protocols or ['gmw', 'beaver']
-filename = args.output.format(t=launch_time.strftime("%d-%m-%Y_%H:%M:%S"))
+filename = args.output_file.format(t=launch_time.strftime("%d-%m-%Y_%H:%M:%S"))
 TRIALS = args.repititions
 cho_file = args.cho_temp
-log((iters, trains, testing_ratio, circuit_names, protocol_types, filename, TRIALS, cho_file))
+configs = sorted(set(
+    ImplementationDetails(**{f.name: v})
+    for f in fields(ImplementationDetails)
+    for v in vars(args)[f.name] or f.metadata['defaults']
+))
+log((iters, trains, testing_ratio, circuit_names, protocol_types, filename, TRIALS, cho_file, configs))
 
-configs = [
-    ImplementationDetails(), # secure
-    *( ImplementationDetails(bias_sharing      = i  ) for i in range(1, 4) ),  # for consistency i should make these args too, but it's a chore.
-    *( ImplementationDetails(bias_and          = i  ) for i in range(1, 4) ),
-    *( ImplementationDetails(accidental_secret = i  ) for i in range(1, 4) ),
-    *( ImplementationDetails(accidental_gate   = i  ) for i in range(1, 4) )
-]
-log(configs)
 
 def scrape_prior(csv_name):
     with open(csv_name, newline='') as f:
@@ -192,13 +191,13 @@ def run_experiment(cho_filename, iters, train, test, results_filename,
         d_tree_time = float(f.read().replace('\'', ''))
 
     with open(results_filename, 'a') as f:
-        line = f'{circuit_name},{protocol_type},{iters},{train},{test},{pval},{data_time},{d_tree_time},{config}\n'
+        line = f'{circuit_name},{protocol_type},{iters},{train},{test},{pval},{data_time},{d_tree_time},{config.as_csv_data()}\n'
         log(line)
         f.write(line)
 
 
 with open(filename, 'w') as f:
-    f.write('circuit,protocol,iters,train_size,test_size,pval,data_time,d_tree_time,bias_sharing,bias_and,accidental_secret,accidental_gate\n')
+    f.write('circuit,protocol,iters,train_size,test_size,pval,data_time,d_tree_time,bias_sharing,bias_and,accidental_secret,accidental_gate,outputs\n')
 
 for circuit_name in circuit_names:
     log(f"Running on: {circuit_name}")

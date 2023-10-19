@@ -18,7 +18,7 @@ argp.add_argument("implementation", type=str, choices=["gmw", "beaver"], help="H
 argp.add_argument("input_file", type=FileType('r', 1, encoding='utf_8', errors='strict'))
 argp.add_argument("output_file", type=FileType('w', 1, encoding='utf_8', errors='strict'))
 for f in fields(ImplementationDetails):
-    argp.add_argument(f"--{f.name}", action="store", type=f.type, default=f.default, help=f.metadata['help'])
+    argp.add_argument(f"--{f.name}", type=f.type, default=f.default, **{k:v for k,v in f.metadata.items() if k in ("help", "default", "choices")})
 args = argp.parse_args()
 config = ImplementationDetails.from_args(args)
 main = {"gmw": gmw.main,
