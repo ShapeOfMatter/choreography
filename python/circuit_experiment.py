@@ -10,18 +10,10 @@ from pprint import PrettyPrinter
 import subprocess
 import sys
 
+from cho_builder.core import ImplementationDetails
+
 
 launch_time = datetime.now()
-
-
-@dataclass(frozen=True)
-class SecurityConfiguration:
-    bias_sharing : int = 0
-    bias_and : int = 0
-    accidental_secret : int = 0
-    accidental_gate : int = 0
-    def __str__(self):
-        return f"{self.bias_sharing},{self.bias_and},{self.accidental_secret},{self.accidental_gate}"
 
 
 argp = ArgumentParser(description="Build various circuits and test them at various powers")
@@ -95,11 +87,11 @@ cho_file = args.cho_temp
 log((iters, trains, testing_ratio, circuit_names, protocol_types, filename, TRIALS, cho_file))
 
 configs = [
-    SecurityConfiguration(), # secure
-    *( SecurityConfiguration(bias_sharing      = i  ) for i in range(1, 4) ),  # for consistency i should make these args too, but it's a chore.
-    *( SecurityConfiguration(bias_and          = i  ) for i in range(1, 4) ),
-    *( SecurityConfiguration(accidental_secret = i  ) for i in range(1, 4) ),
-    *( SecurityConfiguration(accidental_gate   = i  ) for i in range(1, 4) )
+    ImplementationDetails(), # secure
+    *( ImplementationDetails(bias_sharing      = i  ) for i in range(1, 4) ),  # for consistency i should make these args too, but it's a chore.
+    *( ImplementationDetails(bias_and          = i  ) for i in range(1, 4) ),
+    *( ImplementationDetails(accidental_secret = i  ) for i in range(1, 4) ),
+    *( ImplementationDetails(accidental_gate   = i  ) for i in range(1, 4) )
 ]
 log(configs)
 
@@ -112,10 +104,7 @@ def scrape_prior(csv_name):
                    int(row["iters"]),
                    int(row["train_size"]),
                    int(row["test_size"]),
-                   SecurityConfiguration(bias_sharing=int(row["bias_sharing"]),
-                                         bias_and=int(row["bias_and"]),
-                                         accidental_secret=int(row["accidental_secret"]),
-                                         accidental_gate=int(row["accidental_gate"])))
+                   ImplementationDetails.from_dict(row))
 
 already_done = Counter(chain.from_iterable(scrape_prior(p) for p in args.pre_existing))
 log(already_done)
@@ -136,12 +125,15 @@ log(f"CORES={CORES}")
 def gen_circuit_file(circuit_file, cho_file, protocol_type, config):
     circuit_filename = 'circuits/' + circuit_file
 
-    process = ['python', f'python/{protocol_type}_circuit_generator.py',
-                           circuit_filename, cho_file,
-                           '--bias_sharing', str(config.bias_sharing),
-                           '--bias_and', str(config.bias_and),
-                           '--accidental_secret', str(config.accidental_secret),
-                           '--accidental_gate', str(config.accidental_gate)]
+    process = ['python',
+               'python/cho_builder',
+               protocol_type,
+               circuit_filename,
+               cho_file,
+               '--bias_sharing', str(config.bias_sharing),
+               '--bias_and', str(config.bias_and),
+               '--accidental_secret', str(config.accidental_secret),
+               '--accidental_gate', str(config.accidental_gate)]
     log("Generating CHO:")
     log(process)
     p1 = subprocess.Popen(process)
