@@ -1,9 +1,9 @@
 from argparse import (ArgumentParser, FileType)
 from collections import Counter
 from csv import DictReader
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 from datetime import datetime
-from itertools import chain
+from itertools import chain, product
 import math
 import os
 from pprint import PrettyPrinter
@@ -16,7 +16,12 @@ from cho_builder.core import ImplementationDetails
 launch_time = datetime.now()
 
 
-argp = ArgumentParser(description="Build various circuits and test them at various powers. Note that the breakage options are not cross-product-ed; each breakage is done just once.")
+help_message = """Build various circuits and test them at various powers.
+Note the behavior of the breakage arguments: They have defaults, some of which are lists.
+If one of them ends up with only a single value, then that one value will be used for all experiments, but lists will not get cross-product-ed.
+"""
+
+argp = ArgumentParser(description=help_message)
 # We don't use `FileType` arguments because we don't want these handles open all the time.
 argp.add_argument("--iters", "-i", type=int, action="extend", nargs="+", help="Values of \"iterations\" at which to test the circuits.")
 argp.add_argument("--trains", "-t", type=int, action="extend", nargs="+", help="Values of \"training N\" at which to test the circuits.")
@@ -89,10 +94,17 @@ TRIALS = args.repititions
 pad_views = args.unpad
 temp_dir = args.temp_dir
 cho_file = os.path.join(temp_dir, 'tmp.cho')
+config_choices = {f.name: vars(args)[f.name] or f.metadata['defaults']
+                  for f in fields(ImplementationDetails)}
+basic_config = ImplementationDetails(**{f: vs[0]
+                                        for f,vs in config_choices.items()
+                                        if 1 == len(vs)
+                                        })
 configs = sorted(set(
-    ImplementationDetails(**{f.name: v})
-    for f in fields(ImplementationDetails)
-    for v in vars(args)[f.name] or f.metadata['defaults']
+    replace(basic_config, **{f: v})
+    for f,vs in config_choices.items()
+    for v in vs
+    if 1 != len(vs)
 ))
 log((iters, trains, testing_ratio, pad_views, circuit_names, protocol_types, filename, TRIALS, cho_file, configs))
 
