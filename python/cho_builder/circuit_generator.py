@@ -123,10 +123,10 @@ def gen_circuit(config, generators, header, circuit_file, output_file):
 
     emit()
     emit('-- Reveal output?')
-    for r, o in enumerate(output_names, rs):
+    for r, o in enumerate(output_names):
         if 'values' == config.outputs:
-            emit(f'DO reveal(P1({o}_1), P2({o}_2)) GET({r}=y)')
-            emit(f'OUTPUT {r}')
+            emit(f'DO reveal(P1({o}_1), P2({o}_2)) GET(r{r}=y)')
+            emit(f'OUTPUT r{r}')
         elif 'shares' == config.outputs:
             emit(f'OUTPUT {o}_1')
             emit(f'OUTPUT {o}_2')
