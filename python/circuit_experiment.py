@@ -151,8 +151,13 @@ def gen_circuit_file(circuit_file, cho_file, protocol_type, config):
     log("Generating CHO:")
     log(process)
     p1 = subprocess.Popen(process)
-    p1.wait()
-    log("Finished generating CHO.")
+    returncode = p1.wait()
+    if 0 == returncode:
+        log("Finished generating CHO.")
+        return True
+    else:
+        log(f"Failed to generate CHO. Exited with {1}.")
+        return False
 
 def run_experiment(cho_filename, iters, train, test, results_filename,
                    protocol_type, config, circuit_name):
@@ -212,17 +217,21 @@ def run_experiment(cho_filename, iters, train, test, results_filename,
 with open(filename, 'w') as f:
     f.write('circuit,protocol,iters,train_size,test_size,pval,data_time,d_tree_time,bias_sharing,bias_and,accidental_secret,accidental_gate,outputs\n')
 
-for circuit_name in circuit_names:
-    log(f"Running on: {circuit_name}")
-    for protocol_type in protocol_types:
-        for c in configs:
-            gen_circuit_file(circuit_name, cho_file, protocol_type, c)
-
-            for i in iters:
-                for train in trains:
-                    testing = int(train/testing_ratio)
-                    done = already_done[(circuit_name, protocol_type, i, train, testing, c)]
-                    for rep in range(done, TRIALS):
-                        log((i, train, testing, rep))
-                        run_experiment(cho_file, i, train, testing, filename, protocol_type, c, circuit_name)
+for (circuit_name, protocol_type, c) in product(circuit_names, protocol_types, configs):
+    log(f"Running {protocol_type} on {circuit_name} with {c.short()}.")
+    tasks = [(circuit_name, protocol_type, i, train, int(train/testing_ratio), c)
+             for (i, train) in product(iters, trains)]
+    remaining_work = [(k, rep)
+                      for k in tasks
+                      for rep in range(already_done[k], TRIALS)]
+    if 0 < len(remaining_work):
+        wrote_temp_cho = gen_circuit_file(circuit_name, cho_file, protocol_type, c)
+        if wrote_temp_cho:
+            for ((_, _, i, train, testing, _), rep) in remaining_work:
+                log((i, train, testing, rep))
+                run_experiment(cho_file, i, train, testing, filename, protocol_type, c, circuit_name)
+        else:
+            print("Problem generating a CHO file!", file=sys.stderr)
+    else:
+        log("Skipping this CHO; no work to do.")
 

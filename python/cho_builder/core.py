@@ -32,6 +32,11 @@ class ImplementationDetails:
         return cls.from_dict(vars(args))
     def as_csv_data(self):
         return f"{self.bias_sharing},{self.bias_and},{self.accidental_secret},{self.accidental_gate},{self.outputs}"
+    def short(self):
+        return ",".join(f"{f.name}={getattr(self, f.name)}"
+                        for f in fields(self)
+                        if getattr(self, f.name) != f.default
+                       ) or "normal settings"
 
 @dataclass(frozen=True)
 class GateGenerators:
