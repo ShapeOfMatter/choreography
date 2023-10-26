@@ -15,12 +15,13 @@ generators = GateGenerators(and_gate=gen_and, xor_gate=gen_xor, inv_gate=gen_inv
 and_macro = """
 MACRO and_beaver(P1(x2, y2), P2(x1, y1)) AS
   -- generate beaver triple
-  a1 = FLIP @P3
+  {a1_defs}
+  a1 = {a1}
   a2 = FLIP @P3
   b1 = FLIP @P3
-  b2 = FLIP @P3
-  {c1_defs}
-  c1 = {c1}
+  {b2_defs}
+  b2 = {b2}
+  c1 = FLIP @P3
 
   c2 = ((a1 + a2) ^ (b1 + b2)) + c1
 
@@ -65,14 +66,17 @@ Broken acording to: {config}
 def main(input_file, output_file, config):
     share_randomness_var, share_randomness_defs = gen_randomness(config.bias_sharing, 'P1')
     # we only bias one of the dealer flips, to try to keep the scale of this break on par with the other implementation.
-    c1, c1_defs = gen_randomness(config.bias_and, 'P3')
+    a1, a1_defs = gen_randomness(config.bias_and, 'P3', globalizer='a')
+    b2, b2_defs = gen_randomness(config.bias_and, 'P3', globalizer='b')
     and_leakage_var, and_leakage_defs = gen_randomness(config.accidental_gate, 'P2', baseline=0)
 
     header = "\n".join((header_comment.format(input_file=input_file, config=config),
                         share_macro.format(share_randomness_var=share_randomness_var,
                                            share_randomness_defs=share_randomness_defs),
-                        and_macro.format(c1=c1,
-                                         c1_defs=c1_defs,
+                        and_macro.format(a1=a1,
+                                         a1_defs=a1_defs,
+                                         b2=b2,
+                                         b2_defs=b2_defs,
                                          and_leakage_var=and_leakage_var,
                                          and_leakage_defs=and_leakage_defs),
                         reveal_macro.format()))
