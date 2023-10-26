@@ -27,6 +27,15 @@ def gen_xor(a, b):
     emit(f'2 1 {a} {b} {out} XOR')
     return out
 
+def gen_or(a, b):
+    out1 = next_wire()
+    out2 = next_wire()
+    out = next_wire()
+    emit(f'2 1 {a} {b} {out1} AND')
+    emit(f'2 1 {a} {b} {out2} xor')
+    emit(f'2 1 {out1} {out2} {out} XOR')
+    return out
+
 def gen_and(a, b):
     out = next_wire()
     emit(f'2 1 {a} {b} {out} AND')
@@ -34,18 +43,13 @@ def gen_and(a, b):
 
 def gen_less_than(a_bits, b_bits):
     a_greater = None
-    b_greater = None
 
     for a, b in zip(a_bits, b_bits):
         if a_greater is None:
-            assert b_greater is None
             new_a_greater = gen_and(a, gen_not(b))
-            new_b_greater = gen_and(b, gen_not(a))
         else:
-            new_a_greater = gen_xor(a_greater, gen_and(a, gen_and(gen_not(b), gen_not(b_greater))))
-            new_b_greater = gen_xor(b_greater, gen_and(b, gen_and(gen_not(a), gen_not(a_greater))))
+            new_a_greater = gen_or(a_greater, gen_and(a, gen_not(b)))
         a_greater = new_a_greater
-        b_greater = new_b_greater
     return a_greater
 
 
