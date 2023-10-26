@@ -32,7 +32,7 @@ def gen_or(a, b):
     out2 = next_wire()
     out = next_wire()
     emit(f'2 1 {a} {b} {out1} AND')
-    emit(f'2 1 {a} {b} {out2} xor')
+    emit(f'2 1 {a} {b} {out2} XOR')
     emit(f'2 1 {out1} {out2} {out} XOR')
     return out
 
