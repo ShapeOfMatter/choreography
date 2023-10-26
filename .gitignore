@@ -5,4 +5,5 @@ gitignore
 .ipynb_checkpoints
 cores
 __pycache__
+.~*
 
