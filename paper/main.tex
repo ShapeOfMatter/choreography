@@ -13,6 +13,11 @@
 \usepackage{newunicodechar}
 \newunicodechar{Π}{\ifmmode\Pi\else\textPi\fi}
 
+% use quotes as smart-quotes. https://tex.stackexchange.com/a/52354
+\usepackage [english]{babel}
+\usepackage [autostyle, english = american]{csquotes}
+\MakeOuterQuote{"}
+
 \renewcommand{\paragraph}[1]{\vspace*{2pt}\noindent\textbf{#1}}
 
 \newcommand{\system}{\textsc{SystemName}\xspace}
@@ -48,7 +53,18 @@
 \maketitle
 
 \begin{abstract}
-  Abstract goes here.
+  Formal methods for guaranteeing that a protocol satisfies a cryptographic security definition have advanced substantially,
+  but such methods are still labor intensive and the need remains for an automated tool that can positively identify an insecure protocol.
+  We show that the philosophy of property-based-testing, \textit{"run it a bunch of times and see if it breaks"},
+  is at least somewhat feasible in a cryptographic setting.
+  We specifically target Secure Multi-Party Computation, because formal methods targeting this security definition for bit-model implementations
+  are particularly difficult.
+  Using results from the literature for Probabilistic Programming Languages and statistical inference, we devise a test that can
+  detect various flaws in a bit-level implementation of an MPC protocol.
+  The test is grey-box; it requires only transcripts of randomness consumed by the protocol and of the inputs, outputs, and messages.
+  It successfully detects several different mistakes and biases introduced into two different implementations of the classic GMW protocol.
+  Applied to thousands of randomly generated protocols, it identifies nearly all of them as insecure.
+  We also include an analysis of the parameters of the test, and discussion of what makes detection of MPC (in)security difficult.
 \end{abstract}
 
 \section{Introduction}
@@ -70,7 +86,7 @@ Formal proofs of security are a popular and well-suited solution to this problem
           that complicated software systems actually have the security properties their constituent source-code claims to be proven to have.
 \end{itemize}
 
-In the work we particularly focus on Secure Multi-Party Computation (MPC),
+In this work we particularly focus on Secure Multi-Party Computation (MPC),
 a cryptographic primitive with wide-ranging applications but frustrating performance limitations.
 Substantial work has going into improving the performance of MPC systems [citation].
 Additionally, in some cases performance can be improved by using a bespoke protocol instead of a general-purpose MPC system [do we have any evidence of this?].
