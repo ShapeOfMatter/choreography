@@ -90,7 +90,7 @@ Formal proofs of security are a popular and well-suited solution to this problem
 
 In this work we particularly focus on Secure Multi-Party Computation (MPC),
 a cryptographic primitive with wide-ranging applications but frustrating performance limitations.
-Substantial work has going into improving the performance of MPC systems [citation].
+Substantial work has going into improving the performance of MPC systems [TODO: citation].
 Additionally, in some cases performance can be improved by using a bespoke protocol instead of a general-purpose MPC system [do we have any evidence of this?].
 We accelerate this work by providing a tool, comparable to a property-based test,
 for conveniently spot-checking the security of an MPC implementation.
@@ -114,7 +114,7 @@ is a cryptographic process that allows some group of participating parties or ma
 to compute a function that depends on all of their private inputs,
 without any of them learning anything except the final result.
 Implementations that work on arbitrary functions (representable as circuit computations in some field)
-have existed since [...],
+have existed since 1982 [TODO: citation], % https://ieeexplore.ieee.org/document/4568207
 but their use by the public is limited by their performance.
 Some performance limitations are fundamental to the problem
 (roughly, every branch of the computation must be executed so that the control-flow does not itself leak information),
@@ -125,14 +125,14 @@ mapping the tuple of all participants' input vectors to the respective tuple of 
 (or to distributions of outputs, if F is non-deterministic).
 In an \termOfArt{ideal world}, a trusted third party (the \termOfArt{ideal functionality}) would accept input messages
 from all other parties, compute F, and then send the parties their respective outputs.
-A \termOfArt{real world} protocol Π is said to correctly implement F if, for all possible inputs,
+A \termOfArt{real world} protocol Π is said to \textit{correctly} implement F if, for all possible inputs,
 Π results in all parties getting the same outputs as they would have in the ideal world.
-Defining the security of Π requires a clear threat model, and requires defining the participants' "views".
+Defining the \textit{security} of Π requires a clear threat model, and requires defining the participants' "views".
 
 \termOfArt{Passive Security} supposes a computationally-bounded adversary
 that can see everything happening inside a fixed subset of the participating machines.
 This adversary cannot cause the parties to deviate from the protocol Π in any way;
-we are interested in whether it can learn anything beyond the outputs of the "corrupted" machines
+we are interested in whether it can learn anything (beyond the outputs of the "corrupted" machines)
 by observing the execution of Π.
 As an example, this notion of security might be of interest if Alice trusted Bob to participate
 in a distributed computation with her, but did not trust him to properly store or destroy the log-files
@@ -160,7 +160,7 @@ Since the adversary in the ideal world can compute all the data the real-world a
 anything the real-world adversary can compute the ideal-world adversary can also compute!
 
 In practice, security is usually quantified over all possible corruptions $C$
-where $\lvert C \rvert \leq \frac{\lvert P \rvert}{x}$ for some $x$, but this is not fundamental and we only consider a single $C$ at a time.
+where $\lvert C \rvert \leq \frac{\lvert P \rvert}{r}$ for some $r$, but this is not fundamental and we only consider a single $C$ at a time.
 
 Definition 1 is tight, in the sense that attempting to relax it invariable either
 allows a "secure" protocol to do something bad, or requires introducing restrictions
@@ -169,12 +169,13 @@ on the kinds of functionality to which the definition may be applied.
 the functionality is a good thing. [move to footnote])
 That said, some simplification is possible for our purposes:
 Since the (passive) corrupted parties are assumed to follow Π faithfully, we are fine to limit ourselves to
-choreographic protocols in which all messages sent are expected and all messages expected are received.
+\termOfArt{choreographic} protocols in which all messages sent are expected and all messages expected are received.
 In this context, and because the only source of non-determinism is the parties' random tapes
 (which are captured in the real-world views),
 we can safely ignore any messages sent \textit{within} C.
 Then we can collapse all the corrupted parties C into a single party C,
-and similarly all the other parties into a single party H (for "honest").
+and similarly all the other parties into a single party H (for "honest")
+(we don't always do this).
 Finally, in this work we assume that protocols implement their functionalities \textit{correctly},
 and usually leave the corresponding F implicit.
 In other words, we define F to be whatever mapping results from the execution of Π.
@@ -196,33 +197,81 @@ any protocol which is not \termOfArt{passive secure} is automatically not \termO
 
 Certain edge cases are helpful to consider, as they really do map out the edges of the problem of testing from MPC security.
 In the first case, Π itself may be vacuous.
-A protocol in which no information (random bits don't count) is communicated is automatically secure,
+A \termOfArt{vacuous protocol}, one in which no information (random bits don't count), is communicated is automatically secure,
 although of course it can only correctly implement trivial functionalities.
-On the other hand, if the adversary can efficiently deduce a unique possible honest input upon observing the corrupt output,
-then the security is vacuous; any correct implementation of that functionality is secure regardless of what's communicated.
+On the other hand, if the ideal-world adversary can efficiently deduce a unique possible honest input upon observing the corrupt output,
+then the protocol is \termOfArt{vacuously secure}: \textit{any} correct implementation of that functionality is secure regardless of what's communicated.
+These extremes mark the ends of a spectrum; most protocols are somewhere in the middle,
+where learning the output focuses the corrupt party's distribution-estimate of the honest secrets but still leaves some uncertainty.
+On the other hand, this spectrum doesn't capture the assumptions about the adversary's computational limits;
+if inverting the functionality F is NP-hard, then the protocol is \textit{not} vacuously secure, even if F is a bijection.
+
+While MPC can be expressed as a kind of non-interference property, this is only somewhat useful.
+The non-interference can only be meant within the space of possible program traces \textit{posterior to the output}.
+Similarly, trying to avoid such subtleties in the non-interference property by providing a correctly constrained \texttt{reveal} operator
+isn't promising because constraints on \texttt{reveal} would need to recapitulate the original question of security
+and examine the entire rest of the protocol as context.
 
 
-[Other aspects we may wish to cover:
- vacuous protocols,
- vacuous security,
- infertabilty of functionality,
- comparison to control flow properties,
- review of other work,
- review of stuff we tried that didn't work...
- ]
+\subsection{Inference in PPLs}
+
+Efficient inversion of programs and fragments of programs turns out to be so important for determining if a protocol satisfies MPC security.
+Since MPC protocols are probabilistic, what we really need is efficient posterior inference of program inputs in a
+\termOfArt{probabilistic programming language} (PPL).
+
+A PPL is a language that provides stochastic non-deterministic behavior as a language primitive
+and provides meta-theory or auxiliary tooling to reason about the resulting distributions of program behavior.
+In particular, PPLs commonly have semantics defined in terms of transformations on distributions,
+and are designed to ensure that the resulting distributions are amenable to specified techniques for efficient
+inference and sampling. Since even representing a fully-general multivariate distribution takes exponential space with respect to the number of variables,
+PPLs typically restrict the programs and/or distributions they can handle.
+
+For application to the subject of MPC protocols, a PPL would need to handle the two different kinds of uncertainty facing a hypothetical adversary:
+1) Random values generated (by any party) at runtime have known distributions
+(\eg the python expression \texttt{secrets.SystemRandom().random()}
+will sample at runtime from the best floating-point approximation the machine can provide
+of the uniform distribution on $\mathbb{R}_{(0,1]}$).
+2) The secret inputs of the honest parties are not stochastic at all, but the adversary can be asked to provide a distribution over
+possible secrets representing their prior belief so that the secret inputs can also be modeled as random variables.
+
+Hypothetically, supposing a protocol in a PPL providing a multivariate distribution over an appropriate subset of all runtime values,
+if it were possible to efficiently infer and sample from the real-world views
+(or other variables sufficient to deterministically compute a view)
+\textit{posterior to} the corrupt outputs (and corrupt inputs),
+then that would suffice as a simulator
+\textit{if and only if} the inferred distribution were independent of the adversary's choice of prior distribution for the honest secrets.
+So a direct test of MPC security (or a useful over-approximation) could be built from
+A) a language meta-theory guarantee that such posterior inference and sampling would be efficient,
+B) a test or guarantee of independence between the posterior view distribution and the exponentially-many parameters
+of the prior distribution of honest secrets[TODO: footnote], and
+C) the ability to quantify (A) and (B) over all possible corrupt secrets or public inputs, presumably by handling them symbolically.
+Such a system is not necessarily impossible, but we have so far failed to build it.
+
+
+\subsection{Property-based testing}
+
+In industry the normal way to see if a program satisfies some desired property is to run it and see what it does.
+Sometimes this is done with a select handful of inputs or configurations,
+but non-deterministic programs are better evaluated with \termOfArt{property-based testing},
+in which the program is run with many arbitrary (but not necessarily random) configurations.
+Property-based testing is a popular paradigm for testing code in industry;
+the classic Haskell framework QuickCheck [citation] % https://www.cse.chalmers.se/~rjmh/QuickCheck/
+is still in use and has been ported to various other languages.
+
+At face value, property-based testing doesn't generally extend to hyper-properties,
+which can only be assessed by comparing multiple program traces.
+In practice sometimes one can express a hyper-property as a property of multiple of duplicate programs,
+but the sensitivity of the test quickly decays and the logistics of setting up the test quickly grow.
+Furthermore, when the property to be tested is over distributions of traces,
+the various used by good property-based testing frameworks to efficiently find interesting cases are not appropriate.
+
+
+\section{Related Work}
 
 [ computer proofs of MPC paper; (double-check malicions case...)
   l-obliv
   wysteria et al
   probabilistic separation logic]
-
-\subsection{Inference in PPLs}
-
-\subsection{Property-based testing}
-
-
-\section{Related Work}
-
 \subsection{Verification of MPC}
 
 [Computer-aided proofs for multiparty computation with active security](https://arxiv.org/pdf/1806.07197.pdf)
