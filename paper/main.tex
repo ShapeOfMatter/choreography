@@ -307,6 +307,7 @@ continue to appear secure as we increase the power of the test.
 
 
 \section{Case Study Protocols}
+\label{sec:case-study-protocols}
 
 For our evaluation, we implemented six MPC protocols from the literature in \system, and evaluated \system's scalability and ability to find implementation bugs in these protocols. The six protocols are listed in Table~\ref{tbl:protocols}. One is a simple addition protocol, three are basic building blocks often used to build more complex protocols, and two are protocols designed to securely evaluate circuits. All six protocols are designed for two parties, with the addition of a third ``dealer'' party to produce correlated randomness in several of the protocols.
 
@@ -381,15 +382,28 @@ Another MPC protocol for evaluating circuits also uses additive shares to hold w
 
 \section{Evaluation}
 
+Our empirical evaluation demonstrates \system's ability to detect bugs in secure protocols. Our experiments are designed to answer two research questions:
+%
 \begin{itemize}
 \item \textbf{RQ1:} Is \system capable of detecting insecurity in complex, multi-round protocols?
 \item \textbf{RQ2:} Is \system capable of detecting insecurity in real-world protocols?
 \end{itemize}
+%
+To answer RQ1, we generate \emph{random protocols} of varying sizes, and evaluate \system's ability to show they are insecure. The details appear in Section~\ref{sec:experiment-1:-random}. To answer RQ2, we evaluate \system on the case study protocols described in Section~\ref{sec:case-study-protocols}. The details appear in Section~\ref{sec:experiment-2:-real}. In both cases, \system is able to detect insecurity in the target protocols in under a minute.
 
+\subsection{Experiment 1: Random Protocols}
+\label{sec:experiment-1:-random}
 
-\subsection{Experiment 1: Real-world Secure Protocols}
+\paragraph{Experiment setup.}
 
-\subsection{Experiment 2: Random Protocols}
+\paragraph{Results.}
+
+\subsection{Experiment 2: Real-world Protocols}
+\label{sec:experiment-2:-real}
+
+\paragraph{Experiment setup.}
+
+\paragraph{Results.}
 
 
 
