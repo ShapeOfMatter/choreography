@@ -206,12 +206,15 @@ where learning the output focuses the corrupt party's distribution-estimate of t
 On the other hand, this spectrum doesn't capture the assumptions about the adversary's computational limits;
 if inverting the functionality F is NP-hard, then the protocol is \textit{not} vacuously secure, even if F is a bijection.
 
+TODO: maybe say we invented these; give examples. Readers will assume these are existing terms if we don't say otherwise.
+
 While MPC can be expressed as a kind of non-interference property, this is only somewhat useful.
 The non-interference can only be meant within the space of possible program traces \textit{posterior to the output}.
 Similarly, trying to avoid such subtleties in the non-interference property by providing a correctly constrained \texttt{reveal} operator
 isn't promising because constraints on \texttt{reveal} would need to recapitulate the original question of security
 and examine the entire rest of the protocol as context.
 
+TODO: maybe state it explicitly with the conditioning? Then we can say that no system can capture that property.
 
 \subsection{Inference in PPLs}
 
@@ -247,6 +250,7 @@ of the prior distribution of honest secrets[TODO: footnote], and
 C) the ability to quantify (A) and (B) over all possible corrupt secrets or public inputs, presumably by handling them symbolically.
 Such a system is not necessarily impossible, but we have so far failed to build it.
 
+TODO: Is efficient inference really necessary? The conditional independence test might be sufficient? I think we don't want to imply that inference is sufficient, because lots of work has done that
 
 \subsection{Property-based testing}
 
@@ -265,6 +269,7 @@ but the sensitivity of the test quickly decays and the logistics of setting up t
 Furthermore, when the property to be tested is over distributions of traces,
 the various used by good property-based testing frameworks to efficiently find interesting cases are not appropriate.
 
+TODO: maybe cite the Kifer work on property-based testing for DP (also a hyperproperty) and call out that our setting is (maybe) fundamentally high-dimensional so it's super tricky.
 
 \section{Related Work}
 
@@ -458,6 +463,7 @@ Our empirical evaluation demonstrates \system's ability to detect bugs in secure
 \begin{itemize}
 \item \textbf{RQ1:} Is \system capable of detecting insecurity in complex, multi-round protocols?
 \item \textbf{RQ2:} Is \system capable of detecting insecurity in real-world protocols?
+\item \textbf{RQ3:} Is \system scalable to realistic protocols in reasonable time?
 \end{itemize}
 %
 To answer RQ1, we generate \emph{random protocols} of varying sizes, and evaluate \system's ability to show they are insecure. The details appear in Section~\ref{sec:experiment-1:-random}. To answer RQ2, we evaluate \system on the case study protocols described in Section~\ref{sec:case-study-protocols}. The details appear in Section~\ref{sec:experiment-2:-real}. In both cases, \system is able to detect insecurity in the target protocols in under a minute.
@@ -466,15 +472,33 @@ To answer RQ1, we generate \emph{random protocols} of varying sizes, and evaluat
 \label{sec:experiment-1:-random}
 
 \paragraph{Experiment setup.}
+In our first experiment, we generate random protocols and evaluate \system's ability to detect insecurity in these protocols. We randomly generate protocols according to the grammar of XXX. We bias the generated protocols in favor of generating and using randomness in each round of the protocol, in addition to the secret inputs. Random protocols of non-trivial length are extremely likely to be insecure.
+%
+We generate XXXX programs of size XXXX and evaluate \system's ability to detect insecurity.
 
 \paragraph{Results.}
+\emph{results description goes here}
+
 
 \subsection{Experiment 2: Real-world Protocols}
 \label{sec:experiment-2:-real}
 
 \paragraph{Experiment setup.}
+In our second experiment, we evaluate \system's ability to detect insecurity in the real-world protocols described in Section~\ref{sec:case-study-protocols}. We run \system on the unmodified protocol in order to establish that the protocol is secure. Then, we mutate the protocol in several ways to introduce insecurity, and test \system's ability to detect it. Specifically, our mutations are:
+%
+\begin{itemize}
+\item \textbf{Accidental secret}: accidentally sends a secret held by the honest party  to the corrupt party.
+\item \textbf{Accidental gate}: accidentally sends an honest party's result from the evaluation of a multiplication gate to the corrupt party.
+\item \textbf{Biased sharing}: uses biased randomness to construct secret shares of honest party inputs.
+\item \textbf{Biased AND}: uses biased randomness as part of the evaluation of multiplication gates.
+\end{itemize}
+%
+The severity of each mutation can be tuned by adjusting the bias in the related randomness. In the case of ``accidental secret'' and ``accidental gate,'' this affects the probability of accidentally revealing a value; in the others, it directly adjust the bias in the randomness.
 
-\paragraph{Results.}
+\paragraph{Results.} \emph{results description goes here}
+
+\subsection{Discussion}
+
 
 
 
