@@ -273,29 +273,49 @@ TODO: maybe cite the Kifer work on property-based testing for DP (also a hyperpr
 
 \section{Related Work}
 
-Formal methods exist for verifying MPC protocols.
+\subsection{Formal-methods for cryptography}
+Although a useful language-driven test for MPC security remains out of reach,
+a variety of useful work aproaches the subject from different directions.
+
 \cite{https://arxiv.org/pdf/1806.07197.pdf} % Computer-aided proofs for multiparty computation with active security
-use EasyCrypt to show the security of GMW,
-but their technique is only applicable to a protocol with efficiently invertible functionality. 
-and
+use EasyCrypt to manually show the security of GMW.
+Their definitions generalize to protocols with efficiently invertible functionalities.
+% remove? Since existing general-purpose SMPC protocols can easily compute non-invertible functions, this is a serious limitation.
+They model SMPC as a non-interference property: Honest secrets are non-interfering on the corrupt views conditioned on the corrupt outputs.
+If their system could be automated and paired with language constraints to ensure invertibility then it
+could apply to many, but certainly not all, use cases.
+
+\cite{Barth et al} % https://arxiv.org/abs/1907.10708 A Probabilistic Separation Logic
+give a framework for probabilistic reasoning and show that it can be used to prove security of additive secret sharing.
+Even if the technique could be automated, it's unclear how it would generalize to any other kind of protocol.
+
 \cite{Wysteria} % https://www.ieee-security.org/TC/SP2014/papers/Wysteria_c_AProgrammingLanguageforGeneric,Mixed-ModeMultipartyComputations.pdf
-give fine-grain integration of 
-[ computer proofs of MPC paper; (double-check malicions case...)
-  l-obliv
-  wysteria et al
-  probabilistic separation logic]
-\subsection{Verification of MPC}
+give fine-grain integration of MPC as a language primitive, to help a larger program use it efficiently.
+[TODO: there are other/later works along these lines we should cite?]
 
+\cite{lambda-obliv} %
+gives a type system that ensures uniform and independent randomness of key values throughout a program.
+Their system could be adapted to ensure perfect uniformity of parties' views in a protocol,
+but this would of course prevent any non-vacuous functionality from being implemented.
 
-\subsection{Languages built inside of MPC implementations}
 
 \subsection{PPLs for Inference}
 
-dice
+We experimented with choreography languages that translate directly into Sum Product Networks (SPNs) \cite{TODO}.
+A SPN is directed-graph representation of a multi-variate distribution;
+they are compact, allow efficient inference, and can represent values symbolically as needed,
+so testing for conditional independence is practical.
+However, such a language cannot express any existing MPC protocols, and likely cannot express any \textit{useful} protocols,
+because if the language allowed any value to be used more than once, it would result in graphs that violate key invariants of SPNs.
 
-\subsection{PPL proof assistants}
+The \cite{DICE} language analogously translates programs into binary decision diagrams (BDDs).
+BDDs can represent, and do inference on, distributions that aren't representable as SPNs,
+but since the graph \textit{structure} of the BDD of a DICE program depends on the actual \textit{values} on which one is conditioning,
+a dice-based test for the kind of conditional independence needed for MPC would scale exponentially with the input/output width of the protocol.
 
-lilac
+\cite{lilac} % https://arxiv.org/abs/2304.01339
+is a proof-assistant system for reasoning about probability distributions and PPLs.
+It 
 
 \subsection{Probabilistic tests of distributional equality}
 
