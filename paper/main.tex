@@ -269,7 +269,6 @@ but the sensitivity of the test quickly decays and the logistics of setting up t
 Furthermore, when the property to be tested is over distributions of traces,
 the various used by good property-based testing frameworks to efficiently find interesting cases are not appropriate.
 
-TODO: maybe cite the Kifer work on property-based testing for DP (also a hyperproperty) and call out that our setting is (maybe) fundamentally high-dimensional so it's super tricky.
 
 \section{Related Work}
 
@@ -289,6 +288,13 @@ could apply to many, but certainly not all, use cases.
 give a framework for probabilistic reasoning and show that it can be used to prove security of additive secret sharing.
 Even if the technique could be automated, it's unclear how it would generalize to any other kind of protocol.
 
+\cite{Gancher et al} % https://dl.acm.org/doi/pdf/10.1145/3571223
+give a powerful language system that can check if one protocol is a valid simulator of another,
+and show that it works on existing MPC protocols like GMW.
+The user of the system needs to write a second protocol
+representing the composition of the ideal-world functionality and the explicit function $\mathtt{SIM}$,
+and then build a high-level proof of the equivalence in the provided equational logic.
+
 \cite{Wysteria} % https://www.ieee-security.org/TC/SP2014/papers/Wysteria_c_AProgrammingLanguageforGeneric,Mixed-ModeMultipartyComputations.pdf
 give fine-grain integration of MPC as a language primitive, to help a larger program use it efficiently.
 [TODO: there are other/later works along these lines we should cite?]
@@ -298,6 +304,15 @@ gives a type system that ensures uniform and independent randomness of key value
 Their system could be adapted to ensure perfect uniformity of parties' views in a protocol,
 but this would of course prevent any non-vacuous functionality from being implemented.
 
+\cite{OWL} % https://eprint.iacr.org/2023/473.pdf
+gives a type system guaranteeing non-interference with an (extensible) selection of cryptographic operations as language primitives.
+They can type-check more convoluted uses of operations like encryption and hashing, but without features for inference or inversion,
+there's no way to verify an implementation of MPC.
+
+\cite{Fournet et al} % https://www.microsoft.com/en-us/research/wp-content/uploads/2017/01/information-flow-types-for-homomorphic-encryptions-ccs11.pdf
+also use a type system to ensure safe usage of cryptographic primitives,
+but they specifically target homomorphic encryption schemes and the various measures by which such schemes may be correct.
+Like OWL, their type system assumes a secure implementation of the encryption scheme.
 
 \subsection{PPLs for Inference}
 
@@ -315,11 +330,22 @@ a dice-based test for the kind of conditional independence needed for MPC would 
 
 \cite{lilac} % https://arxiv.org/abs/2304.01339
 is a proof-assistant system for reasoning about probability distributions and PPLs.
-It 
+It more expressive than the original probabilistic separation logic,
+but it has not yet been applied to MPC, nor is it clear how it would be used in an automated test.
 
-\subsection{Probabilistic tests of distributional equality}
+\subsection{Probabilistic testing}
 
-[decision trees paper]()
+\cite{Kifer} % https://arxiv.org/pdf/1805.10277.pdf
+and more recently \cite{Zhang et al} % https://dl.acm.org/doi/10.1145/3428233
+use large samples of program executions to test for violations of differential privacy,
+showing that such techniques can work on cryptographic distributional hyper-properties.
+Since differential privacy is only concerned with program inputs and outputs,
+the dimensionality of the problem is somewhat smaller than MPC.
+
+Our work builds directly on \cite{decision trees paper} % where did it go? all i can find is https://arxiv.org/pdf/2007.12325.pdf which definitely isn't what we worked off of...
+who show that batches of ML classifiers (in practice, decision trees, because they're light-weight) can be used to check conditional independence.
+The following section explains this idea, and how we use it, in more detail.
+
 
 \section{The tool in theory}
 
