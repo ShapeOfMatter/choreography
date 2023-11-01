@@ -22,7 +22,7 @@
 
 \renewcommand{\paragraph}[1]{\vspace*{2pt}\noindent\textbf{#1}}
 
-\newcommand{\system}{\textsc{SystemName}\xspace}
+\newcommand{\system}{\textsc{\textbf{.}CHO}\xspace}
 
 \title{Title Goes Here}
 
@@ -467,41 +467,51 @@ Therefore, the uniformly-random padding given to the ideal-world model will be "
 invalidating a key assumption of the whole test:
 that any advantage of the real-world models comes from insecurity in the protocol.
 
+\subsection{Implementation}
+
+Our python script for actually performing the test consumes a stream of fixed-length bit vectors as a CSV.
+Annotation of which columns are available in the real and ideal worlds is provided in the header.
+The CSV is parsed and broken up as needed as a \texttt{pandas} dataframe.
+The individulal ML models are instances of \texttt{sklearn.tree.DecisionTreeClassifier},
+and they're trained in parallel with \texttt{joblib.Parallel}.
+The D-Tree scores are inflated by $+1 \cdot 10^{-10}$ to avoid division-by-zero in the score-ratio,
+and the score distributions are compared by \texttt{scipy.stats.wilcoxon}.
+
+TODO: link to github or other archive?
+
 
 
 \section{Performance analysis}
 
-[TODO: any commentary about the actual python script?]
-
 \subsection{A Choreography Language}
 
-Our python script for actually performing the test consumes a stream of fixed-length bit vectors.
-(In practice, this is a CSV. Annotation of which columns are available in the real and ideal worlds is provided in the header.)
-[Does our tool strictly need the vectors to be fixed width? Could someone do this kind of test on a system with branching control flow?]
-To facilitate analysis of the tool, we implemented a choreographic programming language, CHO,
+To facilitate analysis of the tool, we implemented a choreographic programming language, \system,
 with surrounding tooling to support large batches of parallel evaluations of a single program and piping of the generated data.
-The design of CHO is driven by the contextual assumptions of MPC security.
-[Do we want a BNF? Semantics?]
+(In particular, the semantics are polymorphic within the Haskell type-class \texttt{Data.Bits.FiniteBits},
+\eg sixty four evaluations can run in a single thread by applying the semantics to the \texttt{Word64} type.)
+The design of \system is driven by the contextual assumptions of MPC security.
 In addition to bit-level computations and transmission of single bits between arbitrary parties,
-each party has its own read-only tape for secret inputs and random bits
-(CHO is also a probabilistic language),
+each party has its own read-only tapes for secret inputs and randomness,
 and its own tape for output bits.
-CHO supports macros, but they are extremely limited.
-Finally, CHO supports 1-of-N oblivious transfer as a primitive operation.
+\system supports macros, but they are extremely limited.
+Finally, \system supports 1-of-N oblivious transfer as a primitive operation.
 This allows us to test (correct and incorrect) implementations of the classic GMW protocol.
+
+TODO: refer to an example figure and/or an appendix.
 
 \subsection{Random generation of programs}
 
 The goal of this work is a tool that can detect mistakes in MPC protocols.
 Such a tools is only useful if there if new protocols and implementations are being written.
-Therefore, while it is critical to demonstrate that our tool can detect errors manually edite into known-secure protocols,
+Therefore, while it is critical to demonstrate that our tool can detect errors manually edited into known-secure protocols,
 we \textit{also} need to show that the tool can detect a lack of security in entirely novel and maximally diverse protocols.
 We attempt to show this by randomly generating hundreds [can we say thousands?] of protocols and testing them with different test parameters.
 
 The probability that a randomly generated protocol will be MPC secure is not completely negligible.
-As an easy example, if no communicated values ever depend on secret inputs, then the protocol meets the definition of security!
-(Never mind that such a protocol is useless; \textit{none} of the protocols we generated are \textit{useful}.)
-That said, for reasonable generator settings we find that \textit{very few} generated protocols
+In particular, some generator settings will be biased toward vacuous protocols in which nothing is communicated
+or vacuously secure protocols in which the honest secrets are fully revealed by the ideal functionality.
+(Never mind that such protocols are useless; none of the protocols generated in this experiment are \textit{useful}.)
+That said, for reasonable generator settings we find that very few generated protocols
 continue to appear secure as we increase the power of the test.
 
 [Probably a lot of the details of the generator go in the appendix?]
