@@ -8,10 +8,12 @@
 %%\usepackage{newpxtext}  %% for _e.g._ macro.
 \usepackage{textgreek}
 \usepackage{xspace}
+\usepackage{centernot}
 
 % use these if you also want π to work in math mode
 \usepackage{newunicodechar}
 \newunicodechar{Π}{\ifmmode\Pi\else\textPi\fi}
+\newunicodechar{⫫}{\mathrel{\perp\!\!\!\perp}}
 
 % use quotes as smart-quotes. https://tex.stackexchange.com/a/52354
 \usepackage [english]{babel}
@@ -149,6 +151,7 @@ Both these concepts extend to naturally to lists of parties.
     that correctly implements functionality F,
     is secure against a passive adversary controlling C$\subset$P iff
     there exists a poly-time-computable function $\mathtt{SIM}$ s.t.
+    for all combinations of inputs $\vec{x}$
     $$\begin{aligned}
         \mathsf{Real}_C(Π, \vec{x}) &\cong \mathtt{SIM}(\mathsf{Ideal}_C(F,\vec{x}))
     \end{aligned}$$
@@ -344,53 +347,120 @@ the dimensionality of the problem is somewhat smaller than MPC.
 
 Our work builds directly on \cite{decision trees paper} % where did it go? all i can find is https://arxiv.org/pdf/2007.12325.pdf which definitely isn't what we worked off of...
 who show that batches of ML classifiers (in practice, decision trees, because they're light-weight) can be used to check conditional independence.
-The following section explains this idea, and how we use it, in more detail.
+Specifically, if decision trees (D-Trees trained on random variables $A$ and $C$ do better at predicting the value of a random variable $B$,
+then $A$ and $B$ are not independent conditioned on $C$.
+The test is statistical; many D-Trees are trained and any apparent advantage of the better-informed ones must be assessed for statistical significance.
+In their work the data is assumed to be permuted sub-samples of some finite pool of samples from a population,
+but in our adaptation we use fresh program traces for everything.
 
 
-\section{The tool in theory}
+\section{Statistical testing for MPC insecurity}
 
-... Position the equivalence in the definition of MPC security...
+\subsection{Test algorithm}
+
+If a simulator $\mathtt{SIM}$ exists for a protocol Π implementing functionality F,
+and we suppose fixed corrupt inputs $\vec{x}_C$,
+then for any observed $\vec{y}_C$ the values yielded by $\mathtt{SIM}(\vec{x}_C, \vec{y}_C)$
+will be drawn from the same distribution regardless which of the consistent honest inputs $\vec{x}_H$ were actually used.
+This is conditional independence, and since we assume the simulator is correct (Π is secure),
+we have that independence between the honest secrets and the corrupt real-world views conditional on the corrupt ideal-world views
+is a requisite feature of MPC security.
+In other words
+
+$$
+\left( \vec{y}_H \centernot{⫫} \mathsf{Real}_C(Π, \vec{x}) \mid \mathsf{Ideal}_C(F,\vec{x}) \right)
+\rightarrow
+\nexists \; \mathtt{SIM}
+$$
+
+We use the techniques from \cite{decision trees paper}
+to directly test for conditional dependence without any static analysis of the subject protocol.
 
 To actually test a protocol, one uses two identical machine learning (ML) tools to predict the honest secrets based on the corrupt views.
-One of the two models has access to the "real world" views, and the only has access to the "ideal world" views.
-In principal, \textit{any} ML system is ok to use; the choice is partly an engineering question
+One of the two models has access to the real-world views, and the only has access to the ideal-world views.
+In principal, \textit{any} ML classifier is ok to use; the choice is partly an engineering question
 and partly a judgment call about what kinds of systems will be best able to discern patterns in the views of the subject protocol.
 Generating the data for these tests requires running the protocol many times.
 The process is enumerated in Algorithm 1.
-
-Note that the data must be understood as vectors/matricies/tensors of bits. [is this actually important? are there exceptions/precondidtions?]
+Note that the data must be understood as vectors/matrices/tensors of bits;
+aggregating values into larger structures such as bytes or integers would at best require careful modifications to Algorithm 1.
 
 \begin{algorithm}  %% https://tex.stackexchange.com/a/219820/244649
-  \caption{Does it need a name?}
+  \caption{Test for MPC insecurity}
   \begin{algorithmic}[1]
-  \STATE Set a chosen number of iterations `iters`,
-         number of rows of data on which to train each model `trainN`,
-         and number of rows of data on which to test each model `testN`.
+    \STATE Set a chosen number of iterations \texttt{iters},
+           number of rows of data on which to train each model \texttt{trainN},
+           and number of rows of data on which to test each model \texttt{testN}.
   \STATE Choose $\alpha$, your probability of randomly flagging a secure protocol as insecure.
-  \FOR {`i <- [1..iters]`, calculate scores for the real and ideal models:}
-    \STATE Run the protocol `trainN` times, collecting the corrupt views and honest secrets.
-    \STATE Train the first ML model on the collected data.
-           The real-world views are the input features, and the honest secrets are the labels. [I think this is generic ML terminology?]
-    \STATE Train the second ML model the same way, but occlude (omit or overwrite) view data to only reveal the ideal-world view.
-    \STATE Run the protocol `testN` more times, again collecting the relevant data.
-    \STATE The score for each model is the $L^1$ distance between the testing labels and the respective model outputs
-           (\ie the number of bits wrong when run on the `testN` rows of test data).
-  \ENDFOR
-  \STATE Using the `iters` samples of "real-world" and "ideal-world" scores,
-         calculate the $p$-value for the hypothesis that the distribution of real-world scores is better on average than the ideal-world distribution.
-  \IF {$p \leq \alpha$} \RETURN `INSECURE` \ELSE \RETURN `SECURE` \ENDIF
+    \FOR {\texttt{i$\leftarrow$[1..iters]},
+          calculate scores for the real and ideal models:  \\}
+      \STATE Run the protocol \texttt{trainN} times, collecting the corrupt views and honest secrets.
+      \STATE Train the first ML model on the collected data.
+             The real-world views are the input features, and the honest secrets are the labels.
+      \STATE Train the second ML model the same way, but occlude view data to only reveal the ideal-world view.
+      \STATE Run the protocol \texttt{testN} more times, again collecting the relevant data.
+      \STATE The score for each model is the $L^1$ distance between the testing labels and the respective model outputs
+             (\ie the number of bits wrong when run on the \texttt{testN} rows of test data).
+    \ENDFOR
+    \STATE Using the \texttt{iters} samples of real-world and ideal-world scores,
+           calculate the $p$-value for the hypothesis that
+           the distribution of real-world scores is better on average than the ideal-world distribution.
+    \IF {$p \leq \alpha$} \RETURN \texttt{INSECURE} \ELSE \RETURN \texttt{MAYBE SECURE} \ENDIF
   \end{algorithmic}
 \end{algorithm}
 
-\subsection{Issue: false positives}
+\subsection{Theoretical issues}
 
-What our tool actually invalidates is that the views are uniformly random within the slice compatible with the obseved inputs and outputs. 
+In principal the only aspect of MPC (in)security that conditional (in)dependence fails to capture
+is the constraint on a hypothetical adversary's computational power.
+In other words, a protocol may truly have the appropriate conditional independence,
+but still be insecure because access to the real-world views allows an adversary to compute in polynomial-time
+something that would require super-polynomial-time in the ideal world.
+We believe this to be a much smaller concern in practice than the statistical limitations of independence testing.
+
+The usual trade-offs of significance testing apply.
+Setting $\alpha$ too low will cause programs who's insecure-ness is only marginally discernible to the D-Trees
+to pass the test.
+Setting $\alpha$ higher will compromise one's certainty that a failing program truly is insecure.
+There are three reasons why this is not a serious problem with the test, each worth considering as its own subtlety.
+
+First, if the test returns \texttt{INSECURE},
+then there's nothing wrong with running the test again to see if you were just unlucky.
+This assumes that you have the resources (\eg compute time) to do so, which you might not.
+Since more powerful tests are better able to detect problems,
+if your compute-budget is fixed you're better off spending it all on a single bigger test.
+
+Second, we observe that the transition of an insecure program between "appears secure" and "appears insecure"
+as the power of the test increases is sharp,
+and as the size of the test continues to increase the $p$-values quickly drop below any reasonable $\alpha$.
+This can be frustrating; if you're unsure of the security of a protocol
+then there's always a chance a modestly-more-powerful test might be conclusive.
+On the other hand, it means that at any reasonable fixed test-size,
+most of the protocols it can detect insecure will be \textit{unambiguously} insecure.
+
+The third such mitigating factor is also a problem on its own.
+For a secure program the observed $p$-values
+will typically \textit{not} be sampled from the uniform distribution on $\mathbb{R}_{(0,1]}$,
+and $\alpha$ is actually an \textit{upper bound} on the likelyhood of falsely flagging a protocol as insecure.
+Contrary to casual descriptions of significance testing, this is not a problem with the statistics;
+it's a result of the inequality in the testing hypothesis.
+[TODO: footnote: Significance testing of an \textit{equality} based null-hypothesis will yield uniformly distributed $p$-values
+when the null-hypothesis is true.]
+Because the ML models have no knowlege of the importance or semantics of the bits they're trained on,
+the mostly-random message- and tape-data provided to the real-world models makes it harder for them
+to learn from the input- and output-data they share with the ideal-world models.
+In other words, the additional data on which the real-world models are trained is fundementally a hindrance to them,
+and only becomes advantageous if the protocol is "insecure enough" to overcome this hidrance.
+A protocol might be truely insecure and not have the relevant conditional independence,
+but still appear secure because the advantage an adversary could gain at guessing the honest inputs
+is smaller than the advantage the ideal-world ML models gain from their more focused data.
+This issue can be overcome by setting ...................
 
 
-\section{The tool in practice}
 
-[How weedy do we want to get here?]
+\subsection{Performance analysis}
 
+[TODO: any commentary about the actual python script?]
 
 \subsection{A Choreography Language}
 
@@ -425,10 +495,9 @@ continue to appear secure as we increase the power of the test.
 
 [Probably a lot of the details of the generator go in the appendix?]
 
-\subsection{Performance analysis}
 
 
-\section{Case Study Protocols}
+\subsection{Case-study protocols}
 \label{sec:case-study-protocols}
 
 For our evaluation, we implemented six MPC protocols from the literature in \system, and evaluated \system's scalability and ability to find implementation bugs in these protocols. The six protocols are listed in Table~\ref{tbl:protocols}. One is a simple addition protocol, three are basic building blocks often used to build more complex protocols, and two are protocols designed to securely evaluate circuits. All six protocols are designed for two parties, with the addition of a third ``dealer'' party to produce correlated randomness in several of the protocols.
