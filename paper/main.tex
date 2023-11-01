@@ -506,6 +506,9 @@ Such a tools is only useful if there if new protocols and implementations are be
 Therefore, while it is critical to demonstrate that our tool can detect errors manually edited into known-secure protocols,
 we \textit{also} need to show that the tool can detect a lack of security in entirely novel and maximally diverse protocols.
 We attempt to show this by randomly generating hundreds [can we say thousands?] of protocols and testing them with different test parameters.
+We also use a batch of randomly generated protocols to asses the effects of the three test parameters
+(\texttt{iters}, \texttt{trainN}, and \texttt{testN})
+on the test's power and runtime.
 
 The probability that a randomly generated protocol will be MPC secure is not completely negligible.
 In particular, some generator settings will be biased toward vacuous protocols in which nothing is communicated
