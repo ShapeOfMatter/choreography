@@ -394,7 +394,9 @@ aggregating values into larger structures such as bytes or integers would at bes
   \STATE Choose $\alpha$, your probability of randomly flagging a secure protocol as insecure.
     \FOR {\texttt{i$\leftarrow$[1..iters]},
           calculate scores for the real and ideal models:  \\}
-      \STATE Run the protocol \texttt{trainN} times, collecting the corrupt views and honest secrets.
+      \STATE Run the protocol \texttt{trainN} times,
+             with uniformly random inputs,
+             collecting the corrupt views and honest secrets.
       \STATE Train the first ML model on the collected data.
              The real-world views are the input features, and the honest secrets are the labels.
       \STATE Train the second ML model the same way, but occlude view data to only reveal the ideal-world view.
@@ -454,11 +456,20 @@ and only becomes advantageous if the protocol is "insecure enough" to overcome t
 A protocol might be truely insecure and not have the relevant conditional independence,
 but still appear secure because the advantage an adversary could gain at guessing the honest inputs
 is smaller than the advantage the ideal-world ML models gain from their more focused data.
-This issue can be overcome by setting ...................
+This issue could be overcome by setting \texttt{trainN} sufficiently high;
+the ideal-world models' scores will saturate before the real-world models' do.
+
+One might fix the above problem by padding the ideal-world views with random noise out to the same width as the real-world views.
+In our experiments this introduced an even worse problem.
+The additional data afforded to the real-world models is not fully random;
+the whole view is self-consistent per the semantics of the protocol.
+Therefore, the uniformly-random padding given to the ideal-world model will be "heavier" than what it's supposed to be balancing,
+invalidating a key assumption of the whole test:
+that any advantage of the real-world models comes from insecurity in the protocol.
 
 
 
-\subsection{Performance analysis}
+\section{Performance analysis}
 
 [TODO: any commentary about the actual python script?]
 
