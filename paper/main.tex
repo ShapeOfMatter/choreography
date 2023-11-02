@@ -542,7 +542,7 @@ That said, for reasonable generator settings we find that very few generated pro
 continue to appear secure as we increase the power of the test.
 
 \paragraph{Experiment setup.}
-In our first experiment, we generate random protocols and evaluate \toolname's ability to detect insecurity in these protocols.
+In our first two experiments, we generate random protocols and evaluate \toolname's ability to detect insecurity in these protocols.
 We randomly generate protocols according to the grammar of \langname.
 The generator uses a specified size for each party's secret inputs, random tape, and outputs,
 parameters for the length of the "body" of the program and the "max width" of each computation step,
@@ -550,37 +550,55 @@ and a handful of bias-parameters that affect the frequency of different operatio
 We bias the generated protocols in favor of logical depth;
 values (inputs, coin-flips, messages-received, values calculated) are likely
 to be used on each new line in inverse proportion to the number of times they've already been used.
-We generate XXXX programs of size XXXX and evaluate \toolname's ability to detect insecurity.
+Finally, to focus our experiment on protocols for which there's any question of security,
+\langname protocols that \toolname flags as insecure with very low power-settings
+are filtered out of the stream of generated programs before we include them in our experiments.
 
-\paragraph{Results.}
-\emph{results description goes here}
+We generated 500 programs with 500-line bodies (16-bit inputs and outputs, 48-bit random tapes)
+and evaluate \toolname's ability to detect insecurity as \texttt{trainN} increased.
+Within this experiment we locked \texttt{iters} at 100, and set \texttt{testN} as close to $\frac{\mathtt{trainN}}{4}$ as our setup allowed.
+Each generated \langname file was tested with increasing values of \texttt{trainN} until the observed $p$-values fell below $1.25 \cdot 10^{-4}$.
+
+To observe the relative role of the three test parameters, we generated 200 additional programs using the same settings
+and ran \toolname against each of them with a grid of different parameters.
+
 
 \begin{figure*}
+  \label{fig:sankey}
   \centering
   \newcommand{\gsize}{.9\textwidth}
-\begin{tabular}{c | c}
+\begin{tabular}{c}
     \hline\hline
-    \rotatebox{90}{(a). Detection of insecurity}
-  & \includegraphics[width=\gsize]{graphs/medium2.old.pdf} \\
-    \hline
-    \rotatebox{90}{(b). Test time}
-  & \includegraphics[width=\gsize]{graphs/asymptote_time.pdf} \\
+    \includegraphics[width=\gsize]{graphs/medium2.old.pdf} \\
     \hline
     \hline
 \end{tabular}
 \caption{Experimental results: performance on random protocols under increasing test power.}
 \end{figure*}
 
+\begin{figure}
+  \centering
+  \newcommand{\gsize}{.38\textwidth}
+\begin{tabular}{c}
+    \hline\hline
+    \includegraphics[width=\gsize]{graphs/asymptote_time.pdf} \\
+    \hline
+    \hline
+\end{tabular}
+\caption{Experimental results: runtime with increasing test power.}
+\end{figure}
+
+
 \begin{figure*}
   \centering
   \newcommand{\gsize}{.45\textwidth}
 \begin{tabular}{c | c c}
     \hline\hline
-    \rotatebox{90}{(a). Detection scores}
+    \rotatebox{90}{\phantom{hellohello}(a). Detection scores (summed)}
   & \includegraphics[width=\gsize]{graphs/cube_scores_back.pdf}
   & \includegraphics[width=\gsize]{graphs/cube_scores_front.pdf} \\
     \hline
-    \rotatebox{90}{(b). Test time}
+    \rotatebox{90}{\phantom{hellohellohello}(b). Runtime (s)}
   & \includegraphics[width=\gsize]{graphs/cube_times_back.pdf}
   & \includegraphics[width=\gsize]{graphs/cube_times_front.pdf} \\
     \hline
@@ -588,6 +606,9 @@ We generate XXXX programs of size XXXX and evaluate \toolname's ability to detec
 \end{tabular}
 \caption{Experimental results: trade-offs in power and runtime under different test parameters.}
 \end{figure*}
+
+\paragraph{Results.}
+Figure~\ref{fig:sankey} shows that, while some programs re...
 
 
 \subsection{Case-study protocols}
