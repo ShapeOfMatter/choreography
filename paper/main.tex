@@ -829,10 +829,24 @@ and we believe some changes to the way the data is ingested and handled by the t
 There are also variations on the core concept of \toolname that we believe are worth exploring.
 Decision trees are not the only candidate for the underlying ML model;
 the additional compute-cost of \eg a neural network may turn out to be efficient.
-Other cryptographic properties besides MPC can likely 
+Other cryptographic properties besides MPC can likely be framed in terms of conditional independence;
+and so would be amenable to similar tests.
+Finally, because end-to-end static analysis of MPC protocols has proven so difficult,
+we believe it may be practical to augment a stochastic tool like \toolname with static analysis capabilities
+that would allow it to more efficiently detect insecurity, turning it into a "white-box" test.
 
 
 \section{Conclusions}
+
+We present \toolname,
+a property-based test that checks (a small over-approximation of) MPC security
+using a probabilistic test of conditional independence.
+At its heart, \toolname trains batches of decision trees with and without access to grey-box data from many evaluations of the target protocol
+to see if access to that message data improves their ability to predict the secret inputs.
+While this approach has theoretical limitations, we show that in practice it is able to detect various mistakes in various protocols,
+making it a useful tool for sanity-checking one's work during development.
+We also show that, in practice, the compute-time required for \toolname scales linearly with the power of the test requested,
+and usefully-powerful tests take just a few minutes.
 
 \bibliographystyle{plain}
 \bibliography{refs}
