@@ -241,7 +241,7 @@ TODO: maybe state it explicitly with the conditioning? Then we can say that no s
 
 \subsection{Inference in PPLs}
 
-Efficient inversion of programs and fragments of programs turns out to be so important for determining if a protocol satisfies MPC security.
+Efficient inversion of programs and fragments of programs turns out to be important for determining if a protocol satisfies MPC security.
 Since MPC protocols are probabilistic, what we really need is efficient posterior inference of program inputs in a
 \termOfArt{probabilistic programming language} (PPL).
 
@@ -253,10 +253,11 @@ inference and sampling. Since even representing a fully-general multivariate dis
 PPLs typically restrict the programs and/or distributions they can handle.
 
 For application to the subject of MPC protocols, a PPL would need to handle the two different kinds of uncertainty facing a hypothetical adversary:
-1) Random values generated (by any party) at runtime have known distributions
-(\eg{} the python expression \texttt{secrets.SystemRandom().random()}
-will sample at runtime from the best floating-point approximation the machine can provide
-of the uniform distribution on $\mathbb{R}_{(0,1]}$).
+1) Random values generated (by any party) at runtime have known distributions\footnote{
+    \eg{} in python \texttt{secrets.SystemRandom().random()}
+    will sample at runtime from the best floating-point approximation the machine can provide
+    of the uniform distribution on $\mathbb{R}_{(0,1]}$
+}.
 2) The secret inputs of the honest parties are not stochastic at all, but the adversary can be asked to provide a distribution over
 possible secrets representing their prior belief so that the secret inputs can also be modeled as random variables.
 
@@ -269,11 +270,12 @@ then that would suffice as a simulator
 So a direct test of MPC security (or a useful over-approximation) could be built from
 A) a language meta-theory guarantee that such posterior inference and sampling would be efficient,
 B) a test or guarantee of independence between the posterior view distribution and the exponentially-many parameters
-of the prior distribution of honest secrets[TODO: footnote], and
-C) the ability to quantify (A) and (B) over all possible corrupt secrets or public inputs, presumably by handling them symbolically.
+of the prior distribution of honest secrets\footnote{
+    Presumably such process would need to leave those parameters implicit.
+    Attempting to represent the adversary's prior beliefs more compactly would not produce a valid proof or test of security.
+}, and
+C) the ability to quantify (A) and (B) over all possible corrupt secrets or public inputs.
 Such a system is not necessarily impossible, but we have so far failed to build it.
-
-TODO: Is efficient inference really necessary? The conditional independence test might be sufficient? I think we don't want to imply that inference is sufficient, because lots of work has done that
 
 \subsection{Property-based testing}
 
