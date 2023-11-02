@@ -3,6 +3,7 @@
 \usepackage{cite}
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{algorithm,algorithmic}  %% typset algorithms
+
 \usepackage{graphicx}
 \usepackage{textcomp}
 \usepackage{xcolor}
@@ -21,9 +22,10 @@
 \newunicodechar{⫫}{\mathrel{\perp\!\!\!\perp}}
 
 % use quotes as smart-quotes. https://tex.stackexchange.com/a/52354
-\usepackage [english]{babel}
+%\usepackage [english]{babel}
 \usepackage [autostyle, english = american]{csquotes}
 \MakeOuterQuote{"}
+\usepackage{graphicx}
 
 \renewcommand{\paragraph}[1]{\vspace*{2pt}\noindent\textbf{#1}}
 
@@ -642,5 +644,61 @@ The severity of each mutation can be tuned by adjusting the bias in the related 
 
 \bibliographystyle{plain}
 \bibliography{refs}
+
+\appendices
+
+\section{Additional Experimental Results}
+
+% figures for the main body
+\begin{figure*}
+  \centering
+  \newcommand{\gsize}{.45\textwidth}
+\begin{tabular}{c| c c}
+    \hline\hline
+  & \textbf{OT-Based (GMW)} & \textbf{Beaver Triple-Based}\\
+    \hline\hline
+  \rotatebox{90}{\phantom{hellohello}$n$-bit addition}
+  & \includegraphics[width=\gsize]{graphs/security_adder_gmw_128_1024.pdf}
+                 & \includegraphics[width=\gsize]{graphs/security_adder_beaver_128_1024.pdf} \\
+    \hline
+  \rotatebox{90}{\phantom{hel}$n$-bit less-than comparison}
+  & \includegraphics[width=\gsize]{graphs/security_less_than_gmw_128_1024.pdf}
+                 & \includegraphics[width=\gsize]{graphs/security_less_than_beaver_128_1024.pdf} \\
+    \hline
+  \rotatebox{90}{\phantom{h}$n$-bit Beaver triple generation}
+  & \includegraphics[width=\gsize]{graphs/security_beaver_triple_gen_gmw_128_1024.pdf}
+                 & \includegraphics[width=\gsize]{graphs/security_beaver_triple_gen_beaver_128_1024.pdf} \\
+    \hline
+    \hline
+\end{tabular}
+\caption{Experimental results.}
+\end{figure*}
+
+\begin{figure*}
+  \centering
+  \newcommand{\gsize}{.45\textwidth}
+\begin{tabular}{c| c c}
+    \hline\hline
+  & \textbf{OT-Based (GMW)} & \textbf{Beaver Triple-Based}\\
+    \hline\hline
+  \rotatebox{90}{\phantom{hellohello}$n$-bit addition}
+  & \includegraphics[width=\gsize]{graphs/time_adder_gmw_256_2048.pdf}
+                 & \includegraphics[width=\gsize]{graphs/time_adder_beaver_256_2048.pdf} \\
+    \hline
+  \rotatebox{90}{\phantom{hel}$n$-bit less-than comparison}
+  & \includegraphics[width=\gsize]{graphs/time_less_than_gmw_256_2048.pdf}
+                 & \includegraphics[width=\gsize]{graphs/time_less_than_beaver_256_2048.pdf} \\
+    \hline
+  \rotatebox{90}{\phantom{h}$n$-bit Beaver triple generation}
+  & \includegraphics[width=\gsize]{graphs/time_beaver_triple_gen_gmw_256_2048.pdf}
+                 & \includegraphics[width=\gsize]{graphs/time_beaver_triple_gen_beaver_256_2048.pdf} \\
+    \hline
+    \hline
+\end{tabular}
+\caption{Experimental results: decision tree training time.}
+\end{figure*}
+
+
+\input{full_figures.tex}
 
 \end{document}
