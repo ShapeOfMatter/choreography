@@ -583,6 +583,7 @@ and ran \toolname against each of them with a grid of different parameters.
 \end{figure*}
 
 \begin{figure}
+  \label{fig:linear-time}
   \centering
   \newcommand{\gsize}{.38\textwidth}
 \begin{tabular}{c}
@@ -596,6 +597,7 @@ and ran \toolname against each of them with a grid of different parameters.
 
 
 \begin{figure*}
+  \label{fig:cube-search}
   \centering
   \newcommand{\gsize}{.45\textwidth}
 \begin{tabular}{c | c c}
@@ -604,7 +606,7 @@ and ran \toolname against each of them with a grid of different parameters.
   & \includegraphics[width=\gsize]{graphs/cube_scores_back.pdf}
   & \includegraphics[width=\gsize]{graphs/cube_scores_front.pdf} \\
     \hline
-    \rotatebox{90}{\phantom{hellohellohello}(b). Runtime (s)}
+    \rotatebox{90}{\phantom{hellohellohello}(b). Mean runtime (s)}
   & \includegraphics[width=\gsize]{graphs/cube_times_back.pdf}
   & \includegraphics[width=\gsize]{graphs/cube_times_front.pdf} \\
     \hline
@@ -614,7 +616,31 @@ and ran \toolname against each of them with a grid of different parameters.
 \end{figure*}
 
 \paragraph{Results.}
-Figure~\ref{fig:sankey} shows that, while some programs re...
+Figure~\ref{fig:sankey} shows that, while some programs appear secure at weaker test powers,
+all the programs generated with these settings were identified as insecure with $\texttt{iters}=100$ and $\texttt{trainN}\leq4000$.
+Specifically, this Sankey plot shows 500 randomly generated \langname files moving between buckets labeled
+"\texttt{\#\_sec}" (for secure),
+"\texttt{\#\_ins}" (for insecure at $\alpha=0.05$),
+and "\texttt{\#\_neg}" (for "negligible", insecure at $\alpha=1.25 \cdot 10^{-4}$)
+as they are tested by \toolname with increasing \texttt{trainN}.
+Because there's always a chance (at most $\alpha$) of a secure protocol being flagged insecure,
+\langname{}s sometimes move back to "secure" from "insecure"; we continue testing them until they reach "negligible".
+Figure~\ref{fig:linear-time} shows time data from this same experiment;
+because fewer programs were subjected to the larger tests, the minimum and maximum runtimes converge at the end.
+More importantly, the runtime scales linearly with the amount of data used in the test.
+
+Figure~\ref{fig:cube-search} shows the individual effects of \texttt{iters}, \texttt{trainN}, and \texttt{testN} on \toolname's power and runtime.
+Each 3D heatmap shows aggregate data for 200 randomly generated \toolname files.
+Because is mostly driven by the amount of data consumed ($\texttt{iters} \cdot (\texttt{trainN} + \texttt{testN})$),
+all three affect runtime linearly.
+To maximize the granularity of the test-power analysis, we calculate a score for each combination of parameters,
+where apparently-secure programs count for 2 points,
+programs insecure at $\alpha=0.05$ count for 1 point,
+and programs insecure at $\alpha=0.01$ count for zero.
+Lower scores are "better" because we know all the programs turn out to be actually insecure.
+We observe that scaling all three parameters is desirable,
+but \texttt{trainN} should generally be larger than \texttt{testN},
+and \texttt{iters} can be much smaller.
 
 
 \subsection{Bug-Finding in Real-World Protocols}
