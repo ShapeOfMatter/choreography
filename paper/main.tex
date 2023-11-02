@@ -1,10 +1,15 @@
 \documentclass[compsoc, conference, a4paper, 10pt, times]{IEEEtran}
 
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
 \usepackage{algorithm,algorithmic}  %% typset algorithms
-\usepackage{amssymb}
-\usepackage{amsmath}
-\usepackage{amsthm}
 \usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+
+\usepackage{amsthm}
 %%\usepackage{newpxtext}  %% for _e.g._ macro.
 \usepackage{textgreek}
 \usepackage{xspace}
@@ -22,7 +27,8 @@
 
 \renewcommand{\paragraph}[1]{\vspace*{2pt}\noindent\textbf{#1}}
 
-\newcommand{\system}{\textsc{\textbf{.}CHO}\xspace}
+\newcommand{\langname}{\textsc{\textbf{.}CHO}\xspace}
+\newcommand{\toolname}{\textsc{DT-SIM}\xspace}
 
 \title{Title Goes Here}
 
@@ -481,25 +487,41 @@ TODO: link to github or other archive?
 
 
 
-\section{Performance analysis}
+\section{Evaluation}
+
+We evaluate the test in terms of three standards of performance:
+\begin{itemize}
+\item \textbf{RQ1:} Is \toolname capable of detecting insecurity in novel protocols outside existing MPC paradigms?
+\item \textbf{RQ2:} Is \toolname capable of detecting insecurity in implementations of real MPC protocols?
+\item \textbf{RQ3:} Is \toolname scalable to realistic protocols in reasonable time?
+\end{itemize}
+We address \textbf{RQ1} in Section~\ref{sec:random-protocols}
+and \textbf{RQ2} in Section~\ref{sec:case-study-protocols}.
+In both cases we measure runtime and discuss implications for \textbf{RQ3}.
+To facilitate all our experiments,
+We built a custom DSL for representing protocols at the appropriate granularity and for easy integration with the test script
+(Section~\ref{sec:cho-lang}).
+
 
 \subsection{A Choreography Language}
+\label{sec:cho-lang}
 
-To facilitate analysis of the tool, we implemented a choreographic programming language, \system,
+To facilitate analysis of the tool, we implemented a choreographic programming language, \langname,
 with surrounding tooling to support large batches of parallel evaluations of a single program and piping of the generated data.
 (In particular, the semantics are polymorphic within the Haskell type-class \texttt{Data.Bits.FiniteBits},
 \eg sixty four evaluations can run in a single thread by applying the semantics to the \texttt{Word64} type.)
-The design of \system is driven by the contextual assumptions of MPC security.
+The design of \langname is driven by the contextual assumptions of MPC security.
 In addition to bit-level computations and transmission of single bits between arbitrary parties,
 each party has its own read-only tapes for secret inputs and randomness,
 and its own tape for output bits.
-\system supports macros, but they are extremely limited.
-Finally, \system supports 1-of-N oblivious transfer as a primitive operation.
+\langname supports macros, but they are extremely limited.
+Finally, \langname supports 1-of-N oblivious transfer as a primitive operation.
 This allows us to test (correct and incorrect) implementations of the classic GMW protocol.
 
 TODO: refer to an example figure and/or an appendix.
 
 \subsection{Random generation of programs}
+\label{sec:random-protocols}
 
 The goal of this work is a tool that can detect mistakes in MPC protocols.
 Such a tools is only useful if there if new protocols and implementations are being written.
@@ -517,14 +539,29 @@ or vacuously secure protocols in which the honest secrets are fully revealed by 
 That said, for reasonable generator settings we find that very few generated protocols
 continue to appear secure as we increase the power of the test.
 
-[Probably a lot of the details of the generator go in the appendix?]
+\paragraph{Experiment setup.}
+In our first experiment, we generate random protocols and evaluate \toolname's ability to detect insecurity in these protocols.
+We randomly generate protocols according to the grammar of \langname.
+The generator uses a specified size for each party's secret inputs, random tape, and outputs,
+parameters for the length of the "body" of the program and the "max width" of each computation step,
+and a handful of bias-parameters that affect the frequency of different operations.
+We bias the generated protocols in favor of logical depth;
+values (inputs, coin-flips, messages-received, values calculated) are likely
+to be used on each new line in inverse proportion to the number of times they've already been used.
+We generate XXXX programs of size XXXX and evaluate \toolname's ability to detect insecurity.
+
+\paragraph{Results.}
+\emph{results description goes here}
 
 
 
 \subsection{Case-study protocols}
 \label{sec:case-study-protocols}
 
-For our evaluation, we implemented six MPC protocols from the literature in \system, and evaluated \system's scalability and ability to find implementation bugs in these protocols. The six protocols are listed in Table~\ref{tbl:protocols}. One is a simple addition protocol, three are basic building blocks often used to build more complex protocols, and two are protocols designed to securely evaluate circuits. All six protocols are designed for two parties, with the addition of a third ``dealer'' party to produce correlated randomness in several of the protocols.
+For our evaluation, we implemented three boolean functions, each in two variations of the GMW protocol,
+and evaluated \toolname's scalability and ability to find bugs added to these protocols.
+The function-circuits and protocols are listed in Table~\ref{tbl:protocols}.
+One is a simple addition protocol, three are basic building blocks often used to build more complex protocols, and two are protocols designed to securely evaluate circuits. All six protocols are designed for two parties, with the addition of a third ``dealer'' party to produce correlated randomness in several of the protocols.
 
 \begin{table}
 \centering
@@ -545,7 +582,7 @@ For our evaluation, we implemented six MPC protocols from the literature in \sys
 \end{table}
 
 \paragraph{$n$-bit Addition.}
-The simplest protocol in our evaluation is a basic summation protocol, which adds up the inputs from the two participating parties. To accomplish this task, the protocol essentially simulates a hardware adder circuit---for each bit in the binary representation of the two input numbers, the protocol performs bitwise operations to compute the sum and carry bit. To ensure security, the input values are \emph{secret shared} using additive secret sharing; to secret share a bit, a party selects a random bit to represent one share, and computes the other share by XORing the random bit with the secret bit. In \system, $P_1$ can secret share the bit $x$ with $P_2$ as follows:
+The simplest protocol in our evaluation is a basic summation protocol, which adds up the inputs from the two participating parties. To accomplish this task, the protocol essentially simulates a hardware adder circuit---for each bit in the binary representation of the two input numbers, the protocol performs bitwise operations to compute the sum and carry bit. To ensure security, the input values are \emph{secret shared} using additive secret sharing; to secret share a bit, a party selects a random bit to represent one share, and computes the other share by XORing the random bit with the secret bit. In \langname, $P_1$ can secret share the bit $x$ with $P_2$ as follows:
 %
 \begin{verbatim}
   s1 = FLIP @P1
@@ -555,7 +592,7 @@ The simplest protocol in our evaluation is a basic summation protocol, which add
 %
 $P_1$ can safely send one share to $P_2$, as long as $P_1$ keeps the other share for themselves---neither share alone reveals anything about the secret bit. To add (i.e. XOR) two secret-shared bits, each party can simply add its shares for the two bits to obtain one share of the result. To multiply (i.e. AND) two secret-shared bits, the parties must use oblivious transfer (described next).
 
-Our $n$-bit addition protocol generates a \system source file for a given bitwidth. In our evaluation, we test several different bitwidths to examine the effect of the size of each party's view on the scalability and bug-finding capability of \system.
+Our $n$-bit addition protocol generates a \langname source file for a given bitwidth. In our evaluation, we test several different bitwidths to examine the effect of the size of each party's view on the scalability and bug-finding capability of \toolname.
 
 \paragraph{Oblivious Transfer.}
 Oblivious transfer~\cite{todo} (OT) is a 2-party protocol that allows one party ($R$, the \emph{receiver}) to select one out of several secret inputs provided by the other party ($S$, the \emph{sender}). In 1-out-of-2 OT, $S$ provides 2 secret inputs $x_0$ and $x_1$ and $R$ provides a secret \emph{selection bit} $b$. If $b=0$, $R$ receives $x_0$; if $b=1$, $R$ receives $x_1$. $R$ does not learn anything about the not-selected secret, and $S$ does not learn which secret $R$ selected. This idea can be extended to 1-out-of-$n$ OT by extending the selection bit $b$ to a $\log_2(n)$-bit string.
@@ -566,64 +603,21 @@ Oblivious transfer is a building block for many other protocols.
 % Protocols like GMW (described later) require the use of OT for each AND gate---for large circuits, this means thousands or millions of OTs. \emph{OT extension}~\cite{todo} is an approach for expanding $k$ ``base'' OTs into $m \gg k$ OTs. OT extension can significantly improve the performance of protocols that use many OTs.
 
 \paragraph{Beaver Triple Generation.}
-A \emph{Beaver triple}~\cite{todo} (or \emph{multiplication triple}) is a set of secret shares of numbers $a$, $b$, and $c$ such that $a \cdot b = c$. To use a Beaver triple, $P_1$ must have one share of each of $a$, $b$, and $c$, and $P_2$ must have the other share. Since the values are secret shared, they appear random to each party---but the correlation between the three numbers can be used to perform efficient multiplication between secret-shared numbers (described later). One Beaver triple must be consumed for each multiplication, but they can be generated in a separate offline phase. Beaver triples can be generated by a trusted ``dealer'' party, or by using oblivious transfer. We implement both versions in \system.
+A \emph{Beaver triple}~\cite{todo} (or \emph{multiplication triple}) is a set of secret shares of numbers $a$, $b$, and $c$ such that $a \cdot b = c$. To use a Beaver triple, $P_1$ must have one share of each of $a$, $b$, and $c$, and $P_2$ must have the other share. Since the values are secret shared, they appear random to each party---but the correlation between the three numbers can be used to perform efficient multiplication between secret-shared numbers (described later). One Beaver triple must be consumed for each multiplication, but they can be generated in a separate offline phase. Beaver triples can be generated by a trusted ``dealer'' party, or by using oblivious transfer. We implement both versions in \langname.
 
 \paragraph{GMW (Goldreich-Micali-Widgerson).}
-The GMW protocol is an MPC protocol for evaluating circuits. Each party holds additive secret shares of each wire's value, and evaluates addition gates by adding the shares they hold. The parties evaluate multiplication gates by using 1-out-of-4 oblivious transfer: the first party generates a random bit for its share of the output, and acts as the sender in OT; the second party acts as the receiver in OT and receives its share of the output. We implemented a compiler to generate \system programs that evaluate  Bristol fashion circuits using GMW, and evaluated it on circuits implementing integer addition and integer inequalities.
+The GMW protocol is an MPC protocol for evaluating circuits. Each party holds additive secret shares of each wire's value, and evaluates addition gates by adding the shares they hold. The parties evaluate multiplication gates by using 1-out-of-4 oblivious transfer: the first party generates a random bit for its share of the output, and acts as the sender in OT; the second party acts as the receiver in OT and receives its share of the output. We implemented a compiler to generate \langname programs that evaluate  Bristol fashion circuits using GMW, and evaluated it on circuits implementing integer addition and integer inequalities.
 
 \paragraph{MPC with Beaver Triples.}
-Another MPC protocol for evaluating circuits also uses additive shares to hold wire values, but uses Beaver triples to evaluate multiplication gates (instead of OT). Given shares of a Beaver triple, the parties perform two multiplication-by-constant and broadcast operations, and derive one share each of the product. Our implementation of this approach employees a third-party ``dealer'' who generates the triples; a pre-processing (offline) phase can also be used to generate the triples. We evaluate \system on this protocol using the same circuits as in our GMW experiments.
+Another MPC protocol for evaluating circuits also uses additive shares to hold wire values, but uses Beaver triples to evaluate multiplication gates (instead of OT). Given shares of a Beaver triple, the parties perform two multiplication-by-constant and broadcast operations, and derive one share each of the product. Our implementation of this approach employees a third-party ``dealer'' who generates the triples; a pre-processing (offline) phase can also be used to generate the triples. We evaluate \toolname on this protocol using the same circuits as in our GMW experiments.
 
 
-% \paragraph{Circuits.}
-% To evaluate the circuit-based protocols, we used five binary circuits that are publicly available in the ``Bristol-fashion'' format~\cite{todo}. We chose commonly-used circuits with a range of sizes to test \system's scalability. Table~\ref{tbl:circuits} lists the circuits used in our evaluation, along with the number of gates in each circuit.
+Our empirical evaluation demonstrates \toolname's ability to detect bugs in secure protocols.
+To answer RQ1, we generate \emph{random protocols} of varying sizes, and evaluate \toolname's ability to show they are insecure. The details appear in Section~\ref{sec:experiment-1:-random}. To answer RQ2, we evaluate \toolname on the case study protocols described in Section~\ref{sec:case-study-protocols}. The details appear in Section~\ref{sec:experiment-2:-real}. In both cases, \toolname is able to detect insecurity in the target protocols in under a minute.
 
-% \begin{table}
-% \centering
-%   \begin{tabular}{|l |l|l|}
-%     \hline
-%     \textbf{Circuit} & \textbf{AND Gates} & \textbf{Total Gates} \\
-%     \hline
-%     64-bit adder & 63 & 376 \\
-%     64-bit multiplier & 4,033 & 13,675 \\
-%     AES-128 & 6,400 & 36,663 \\
-%     SHA-256 & 22,573 & 135,073 \\
-%     Floating-point division & 82,269 & 184,007 \\
-%     \hline
-%   \end{tabular}
-%   \caption{Circuits used in our evaluation.}
-%   \label{tbl:circuits}
-% \end{table}
-
-\section{Evaluation}
-
-Our empirical evaluation demonstrates \system's ability to detect bugs in secure protocols. Our experiments are designed to answer two research questions:
-%
-\begin{itemize}
-\item \textbf{RQ1:} Is \system capable of detecting insecurity in complex, multi-round protocols?
-\item \textbf{RQ2:} Is \system capable of detecting insecurity in real-world protocols?
-\item \textbf{RQ3:} Is \system scalable to realistic protocols in reasonable time?
-\end{itemize}
-%
-To answer RQ1, we generate \emph{random protocols} of varying sizes, and evaluate \system's ability to show they are insecure. The details appear in Section~\ref{sec:experiment-1:-random}. To answer RQ2, we evaluate \system on the case study protocols described in Section~\ref{sec:case-study-protocols}. The details appear in Section~\ref{sec:experiment-2:-real}. In both cases, \system is able to detect insecurity in the target protocols in under a minute.
-
-\subsection{Experiment 1: Random Protocols}
-\label{sec:experiment-1:-random}
 
 \paragraph{Experiment setup.}
-In our first experiment, we generate random protocols and evaluate \system's ability to detect insecurity in these protocols. We randomly generate protocols according to the grammar of XXX. We bias the generated protocols in favor of generating and using randomness in each round of the protocol, in addition to the secret inputs. Random protocols of non-trivial length are extremely likely to be insecure.
-%
-We generate XXXX programs of size XXXX and evaluate \system's ability to detect insecurity.
-
-\paragraph{Results.}
-\emph{results description goes here}
-
-
-\subsection{Experiment 2: Real-world Protocols}
-\label{sec:experiment-2:-real}
-
-\paragraph{Experiment setup.}
-In our second experiment, we evaluate \system's ability to detect insecurity in the real-world protocols described in Section~\ref{sec:case-study-protocols}. We run \system on the unmodified protocol in order to establish that the protocol is secure. Then, we mutate the protocol in several ways to introduce insecurity, and test \system's ability to detect it. Specifically, our mutations are:
+In our second experiment, we evaluate \toolname's ability to detect insecurity in the real-world protocols described in Section~\ref{sec:case-study-protocols}. We run \toolname on the unmodified protocol in order to establish that the protocol is secure. Then, we mutate the protocol in several ways to introduce insecurity, and test \toolname's ability to detect it. Specifically, our mutations are:
 %
 \begin{itemize}
 \item \textbf{Accidental secret}: accidentally sends a secret held by the honest party  to the corrupt party.
