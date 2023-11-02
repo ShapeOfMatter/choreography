@@ -563,12 +563,30 @@ We generate XXXX programs of size XXXX and evaluate \toolname's ability to detec
     \rotatebox{90}{(a). Detection of insecurity}
   & \includegraphics[width=\gsize]{graphs/medium2.old.pdf} \\
     \hline
-    \rotatebox{90}{(b). Runtime performance}
+    \rotatebox{90}{(b). Test time}
   & \includegraphics[width=\gsize]{graphs/asymptote_time.pdf} \\
     \hline
     \hline
 \end{tabular}
-\caption{Experimental results: performance on random protocols.}
+\caption{Experimental results: performance on random protocols under increasing test power.}
+\end{figure*}
+
+\begin{figure*}
+  \centering
+  \newcommand{\gsize}{.45\textwidth}
+\begin{tabular}{c | c c}
+    \hline\hline
+    \rotatebox{90}{(a). Detection scores}
+  & \includegraphics[width=\gsize]{graphs/cube_scores_back.pdf}
+  & \includegraphics[width=\gsize]{graphs/cube_scores_front.pdf} \\
+    \hline
+    \rotatebox{90}{(b). Test time}
+  & \includegraphics[width=\gsize]{graphs/cube_times_back.pdf}
+  & \includegraphics[width=\gsize]{graphs/cube_times_front.pdf} \\
+    \hline
+    \hline
+\end{tabular}
+\caption{Experimental results: trade-offs in power and runtime under different test parameters.}
 \end{figure*}
 
 
