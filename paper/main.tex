@@ -520,6 +520,12 @@ and its own tape for output bits.
 Finally, \langname supports 1-of-N oblivious transfer as a primitive operation.
 This allows us to test (correct and incorrect) implementations of the classic GMW protocol.
 
+\paragraph{Oblivious Transfer.}
+Oblivious transfer~\cite{todo} (OT) is a 2-party protocol that allows one party ($R$, the \emph{receiver}) to select one out of several secret inputs provided by the other party ($S$, the \emph{sender}). In 1-out-of-2 OT, $S$ provides 2 secret inputs $x_0$ and $x_1$ and $R$ provides a secret \emph{selection bit} $b$. If $b=0$, $R$ receives $x_0$; if $b=1$, $R$ receives $x_1$. $R$ does not learn anything about the not-selected secret, and $S$ does not learn which secret $R$ selected. This idea can be extended to 1-out-of-$n$ OT by extending the selection bit $b$ to a $\log_2(n)$-bit string.
+%
+Oblivious transfer is a building block for many other protocols.
+
+
 TODO: refer to an example figure and/or an appendix.
 
 \subsection{Random generation of programs}
@@ -590,44 +596,69 @@ We generate XXXX programs of size XXXX and evaluate \toolname's ability to detec
 \end{figure*}
 
 
-\subsection{Case-study protocols}
+\subsection{Bug-Finding in Real-World Protocols}
 \label{sec:case-study-protocols}
 
-For our evaluation, we implemented three boolean functions, each in two variations of the GMW protocol,
-and evaluated \toolname's scalability and ability to find bugs added to these protocols.
-The function-circuits and protocols are listed in Table~\ref{tbl:protocols}.
-One is a simple addition protocol, three are basic building blocks often used to build more complex protocols, and two are protocols designed to securely evaluate circuits. All six protocols are designed for two parties, with the addition of a third ``dealer'' party to produce correlated randomness in several of the protocols.
+Our second set of experiments evaluates \toolname's ability to detect security bugs in real-world protocols. We implement two MPC frameworks for evaluating circuits, instantiate them with three different functions to obtain specialized protocols, systematically introduce bugs into these protocols, and evaluate \toolname's ability to detect the bugs. We summarize the implemented protocols in Section~\ref{sec:protocols-evaluated}, describe the experiment in Section~\ref{sec:e2-experiment-setup}, and present the results in Section~\ref{sec:e2_results}.
+
+\subsubsection{Protocols Evaluated}
+\label{sec:protocols-evaluated}
+
+For our evaluation, we consider two MPC frameworks for evaluating circuits, and instantiate those frameworks with three different functions (represented as circuits) to construct secure protocols. The frameworks and functions are listed in Table~\ref{tbl:protocols} and described below.
+All six protocols are designed for two parties, with the addition of a third ``dealer'' party to produce correlated randomness in several of the protocols.
 
 \begin{table}
-\centering
-  \begin{tabular}{|l | l|l|}
+  \centering
+  \renewcommand*{\arraystretch}{1.2}
+  \begin{tabular}{|l l|}
     \hline
-    \textbf{Protocol} & \textbf{Purpose} & \textbf{Ref.} \\
+    \textbf{MPC Frameworks} & \textbf{Approach} \\
     \hline
-    $n$-bit Addition & Custom & TODO \\
-    Oblivious Transfer & Building block & TODO \\
+    %Oblivious Transfer & Building block & TODO \\
 %    OT Extension & Building block & TODO \\
-    Beaver Triple Generation & Building block & TODO \\
-    GMW & Circuit evaluation & TODO \\
-    MPC w/ Beaver Triples & Circuit evaluation & TODO \\
+    GMW~\cite{goldreich2019play, goldreich2009foundations} & Oblivious Transfer\\
+    MPC w/ Beaver Triples~\cite{beaver1992efficient} & Beaver Triples\\[4pt]
+    \hline
+    \textbf{Instantiated Functions} & \textbf{Leakage}\\
+    \hline
+    $n$-bit Addition & All \\
+    $n$-bit Less-than Comparison & Partial \\
+    Beaver Triple Generation & None \\
     \hline
   \end{tabular}
-  \caption{Secure protocols used in our evaluation.}
+  \bigskip
+  \caption{MPC frameworks and instantiated functions used in our evaluation. Each framework describes an approach for evaluating a binary circuit in MPC; we instantiate both frameworks with three different functions (represented as circuits) to construct secure protocols. }
   \label{tbl:protocols}
 \end{table}
 
-\paragraph{$n$-bit Addition.}
-The simplest protocol in our evaluation is a basic summation protocol, which adds up the inputs from the two participating parties. To accomplish this task, the protocol essentially simulates a hardware adder circuit---for each bit in the binary representation of the two input numbers, the protocol performs bitwise operations to compute the sum and carry bit. To ensure security, the input values are \emph{secret shared} using additive secret sharing; to secret share a bit, a party selects a random bit to represent one share, and computes the other share by XORing the random bit with the secret bit. In \langname, $P_1$ can secret share the bit $x$ with $P_2$ as follows:
+\paragraph{GMW (Goldreich-Micali-Widgerson).}
+The GMW protocol~\cite{goldreich2019play, goldreich2009foundations} is an MPC protocol for evaluating circuits. Each party holds \emph{additive secret shares} of each wire's value; to secret share a bit, a party selects a random bit to represent one share, and computes the other share by XORing the random bit with the secret bit.
 %
-\begin{verbatim}
-  s1 = FLIP @P1
-  s2 = x + s1
-  SEND s1 TO P2
-\end{verbatim}
+The parties evaluate addition gates (and other linear operations) by adding the shares they hold.
 %
-$P_1$ can safely send one share to $P_2$, as long as $P_1$ keeps the other share for themselves---neither share alone reveals anything about the secret bit. To add (i.e. XOR) two secret-shared bits, each party can simply add its shares for the two bits to obtain one share of the result. To multiply (i.e. AND) two secret-shared bits, the parties must use oblivious transfer (described next).
+The parties evaluate multiplication gates by using 1-out-of-4 oblivious transfer: the first party generates a random bit for its share of the output, and acts as the sender in OT; the second party acts as the receiver in OT and receives its share of the output. We implemented a compiler to generate \langname programs that evaluate Bristol fashion circuits using GMW.
 
-Our $n$-bit addition protocol generates a \langname source file for a given bitwidth. In our evaluation, we test several different bitwidths to examine the effect of the size of each party's view on the scalability and bug-finding capability of \toolname.
+\paragraph{MPC with Beaver Triples.}
+Another MPC protocol for evaluating circuits also uses additive shares to hold wire values, but uses \emph{Beaver triples}~\cite{beaver1992efficient} to evaluate multiplication gates (instead of OT). A Beaver triple (or \emph{multiplication triple}) is a set of secret shares of numbers $a$, $b$, and $c$ such that $a \cdot b = c$. To use a Beaver triple, $P_1$ must have one share of each of $a$, $b$, and $c$, and $P_2$ must have the other share. Since the values are secret shared, they appear random to each party---but the correlation between the three numbers can be used to perform efficient multiplication between secret-shared numbers (described later). One Beaver triple must be consumed for each multiplication, but they can be generated in a separate offline phase.
+
+Given shares of a Beaver triple, the parties perform two multiplication-by-constant and broadcast operations, and derive one share each of the product. Our implementation of this approach employees a third-party ``dealer'' who generates the triples; a pre-processing (offline) phase can also be used to generate the triples. We implemented a similar compiler to generate \langname programs leveraging this approach for circuit specifications.
+
+
+\paragraph{Functions evaluated.}
+We evaluate three functions, which we express as binary circuits for two parties and compile to \langname programs using the approach described above. All three functions expect input from both the honest and corrupt party. The first, an $n$-bit addition circuit, is vacuously secure---its ideal functionality leaks all of the honest party's inputs, because the corrupt party can subtract their inputs from the $n$-bit result to reconstruct the honest party's inputs. The second, an $n$-bit less-than comparison circuit, only leaks a single bit of information---which of the two inputs is larger. For $n=1$, the less-than protocol is also vacuously secure, but it leaks only partial information about the honest party's inputs for $n>1$. The third, an $n$-bit Beaver triple generator, leaks no information about the honest party's input, since its output to each party is a single secret share of the Beaver triple.
+
+% \paragraph{$n$-bit Addition.}
+% The simplest protocol in our evaluation is a basic summation protocol, which adds up the inputs from the two participating parties. To accomplish this task, the protocol essentially simulates a hardware adder circuit---for each bit in the binary representation of the two input numbers, the protocol performs bitwise operations to compute the sum and carry bit. To ensure security, the input values are \emph{secret shared} using additive secret sharing; to secret share a bit, a party selects a random bit to represent one share, and computes the other share by XORing the random bit with the secret bit. In \langname, $P_1$ can secret share the bit $x$ with $P_2$ as follows:
+% %
+% \begin{verbatim}
+%   s1 = FLIP @P1
+%   s2 = x + s1
+%   SEND s1 TO P2
+% \end{verbatim}
+% %
+% $P_1$ can safely send one share to $P_2$, as long as $P_1$ keeps the other share for themselves---neither share alone reveals anything about the secret bit. To add (i.e. XOR) two secret-shared bits, each party can simply add its shares for the two bits to obtain one share of the result. To multiply (i.e. AND) two secret-shared bits, the parties must use oblivious transfer (described next).
+
+% Our $n$-bit addition protocol generates a \langname source file for a given bitwidth. In our evaluation, we test several different bitwidths to examine the effect of the size of each party's view on the scalability and bug-finding capability of \toolname.
 
 \begin{figure*}
   \centering
@@ -650,29 +681,18 @@ Our $n$-bit addition protocol generates a \langname source file for a given bitw
     \hline
     \hline
 \end{tabular}
-\caption{Experimental results: ability to detect security bugs.}
+\caption{Experimental results: ability to detect security bugs. We set the number of iterations to 128 and the training set size to 1024. Results for other settings appear in Appendix~\ref{sec:addit-exper-results}.}
+\label{fig:results_security}
 \end{figure*}
 
-\paragraph{Oblivious Transfer.}
-Oblivious transfer~\cite{todo} (OT) is a 2-party protocol that allows one party ($R$, the \emph{receiver}) to select one out of several secret inputs provided by the other party ($S$, the \emph{sender}). In 1-out-of-2 OT, $S$ provides 2 secret inputs $x_0$ and $x_1$ and $R$ provides a secret \emph{selection bit} $b$. If $b=0$, $R$ receives $x_0$; if $b=1$, $R$ receives $x_1$. $R$ does not learn anything about the not-selected secret, and $S$ does not learn which secret $R$ selected. This idea can be extended to 1-out-of-$n$ OT by extending the selection bit $b$ to a $\log_2(n)$-bit string.
-%
-Oblivious transfer is a building block for many other protocols.
 
 % \paragraph{Oblivious Transfer Extension.}
 % Protocols like GMW (described later) require the use of OT for each AND gate---for large circuits, this means thousands or millions of OTs. \emph{OT extension}~\cite{todo} is an approach for expanding $k$ ``base'' OTs into $m \gg k$ OTs. OT extension can significantly improve the performance of protocols that use many OTs.
 
-\paragraph{Beaver Triple Generation.}
-A \emph{Beaver triple}~\cite{todo} (or \emph{multiplication triple}) is a set of secret shares of numbers $a$, $b$, and $c$ such that $a \cdot b = c$. To use a Beaver triple, $P_1$ must have one share of each of $a$, $b$, and $c$, and $P_2$ must have the other share. Since the values are secret shared, they appear random to each party---but the correlation between the three numbers can be used to perform efficient multiplication between secret-shared numbers (described later). One Beaver triple must be consumed for each multiplication, but they can be generated in a separate offline phase. Beaver triples can be generated by a trusted ``dealer'' party, or by using oblivious transfer. We implement both versions in \langname.
-
-\paragraph{GMW (Goldreich-Micali-Widgerson).}
-The GMW protocol is an MPC protocol for evaluating circuits. Each party holds additive secret shares of each wire's value, and evaluates addition gates by adding the shares they hold. The parties evaluate multiplication gates by using 1-out-of-4 oblivious transfer: the first party generates a random bit for its share of the output, and acts as the sender in OT; the second party acts as the receiver in OT and receives its share of the output. We implemented a compiler to generate \langname programs that evaluate  Bristol fashion circuits using GMW, and evaluated it on circuits implementing integer addition and integer inequalities.
-
-\paragraph{MPC with Beaver Triples.}
-Another MPC protocol for evaluating circuits also uses additive shares to hold wire values, but uses Beaver triples to evaluate multiplication gates (instead of OT). Given shares of a Beaver triple, the parties perform two multiplication-by-constant and broadcast operations, and derive one share each of the product. Our implementation of this approach employees a third-party ``dealer'' who generates the triples; a pre-processing (offline) phase can also be used to generate the triples. We evaluate \toolname on this protocol using the same circuits as in our GMW experiments.
 
 
-Our empirical evaluation demonstrates \toolname's ability to detect bugs in secure protocols.
-To answer RQ1, we generate \emph{random protocols} of varying sizes, and evaluate \toolname's ability to show they are insecure. The details appear in Section~\ref{sec:experiment-1:-random}. To answer RQ2, we evaluate \toolname on the case study protocols described in Section~\ref{sec:case-study-protocols}. The details appear in Section~\ref{sec:experiment-2:-real}. In both cases, \toolname is able to detect insecurity in the target protocols in under a minute.
+% Our empirical evaluation demonstrates \toolname's ability to detect bugs in secure protocols.
+% To answer RQ1, we generate \emph{random protocols} of varying sizes, and evaluate \toolname's ability to show they are insecure. The details appear in Section~\ref{sec:experiment-1:-random}. To answer RQ2, we evaluate \toolname on the case study protocols described in Section~\ref{sec:case-study-protocols}. The details appear in Section~\ref{sec:experiment-2:-real}. In both cases, \toolname is able to detect insecurity in the target protocols in under a minute.
 
 \begin{figure*}
   \centering
@@ -696,10 +716,13 @@ To answer RQ1, we generate \emph{random protocols} of varying sizes, and evaluat
     \hline
 \end{tabular}
 \caption{Experimental results: decision tree training time.}
+\label{fig:results_training_time}
 \end{figure*}
 
-\paragraph{Experiment setup.}
-In our second experiment, we evaluate \toolname's ability to detect insecurity in the real-world protocols described in Section~\ref{sec:case-study-protocols}. We run \toolname on the unmodified protocol in order to establish that the protocol is secure. Then, we mutate the protocol in several ways to introduce insecurity, and test \toolname's ability to detect it. Specifically, our mutations are:
+\subsubsection{Experiment Setup}
+\label{sec:e2-experiment-setup}
+
+We run \toolname on the unmodified protocol in order to establish the protocol's security. Then, we mutate the protocol in several ways to introduce security bugs, and test \toolname's ability to detect these bugs. Specifically, our mutations are:
 %
 \begin{itemize}
 \item \textbf{Accidental secret}: accidentally sends a secret held by the honest party  to the corrupt party.
@@ -710,7 +733,20 @@ In our second experiment, we evaluate \toolname's ability to detect insecurity i
 %
 The severity of each mutation can be tuned by adjusting the bias in the related randomness. In the case of ``accidental secret'' and ``accidental gate,'' this affects the probability of accidentally revealing a value; in the others, it directly adjust the bias in the randomness.
 
-\paragraph{Results.} \emph{results description goes here}
+\subsubsection{Results}
+\label{sec:e2_results}
+
+The results appear in Figures~\ref{fig:results_security} and~\ref{fig:results_training_time}. For the results in Figure~\ref{fig:results_security}, we set the number of iterations to 128 and the training set size to 1024. The results are similar for other settings; additional experimental results appear in Appendix~\ref{sec:addit-exper-results}.
+
+\paragraph{Detecting security bugs.}
+For the $n$-bit addition function,...
+
+For the $n$-bit less-than comparison,...
+
+For the $n$-bit Beaver triple generation function,...
+
+\paragraph{Scalability.}
+The primary computational cost of \toolname is the time taken to train the decision trees. We record the total training time for each combination of MPC framework and function, and plot the results for several settings in Figure~\ref{fig:results_training_time}. For the settings we evaluated, training time grows linearly with the number of iterations, the training data size, and the bitwidth of the target function (i.e. the size of the circuit being tested). Even for the largest bitwidths we considered, training takes only seconds to minutes.
 
 \subsection{Discussion}
 
@@ -728,7 +764,7 @@ The severity of each mutation can be tuned by adjusting the bias in the related 
 \appendices
 
 \section{Additional Experimental Results}
-
+\label{sec:addit-exper-results}
 
 
 
