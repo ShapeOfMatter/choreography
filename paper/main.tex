@@ -802,13 +802,22 @@ The primary computational cost of \toolname is the time taken to train the decis
 
 \subsection{Discussion}
 
-The results of this experiment suggest that \toolname scales linearly with protocol size and test power, and is capable of detecting bugs in real-world protocols. The test typically runs in just seconds to minutes. The results of our experiment on protocol mutations show that \toolname is effective for detecting important classes of security bugs, but that care must be taken in interpreting the results.
+The results of these experiments suggest that \toolname scales linearly with protocol size and test power, and is capable of detecting bugs in real-world protocols. The test typically runs in just seconds to minutes. The results of our experiment on protocol mutations show that \toolname is effective for detecting important classes of security bugs, but that care must be taken in interpreting the results.
 
 For security bugs that directly reveal sensitive information (e.g. \textbf{biased sharing} bugs) \toolname is particularly effective. Our results suggest that \toolname is capable of detecting these accidental disclosures even at low test powers and in the context of large protocols.
 
 \toolname is less effective for security bugs that require significant ``backwards computation'' to leverage the leaked information (e.g. \textbf{accidental gate} bugs), since decision trees are not well-suited to solving this problem. A more sophisticated model---such as a deep neural network---may be able to perform this kind of computation, but would take significantly longer to train.
 
 \section{Future Work}
+
+Some further works is needed to turn \toolname into a deploy-able tool;
+our experiments so far are not sufficient to calculate sensible default settings,
+and we believe some changes to the way the data is ingested and handled by the tool could improve efficiency.
+
+There are also variations on the core concept of \toolname that we believe are worth exploring.
+Decision trees are not the only candidate for the underlying ML model;
+the additional compute-cost of \eg a neural network may turn out to be efficient.
+Other cryptographic properties besides MPC can likely 
 
 
 \section{Conclusions}
