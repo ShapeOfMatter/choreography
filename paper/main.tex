@@ -596,6 +596,30 @@ $P_1$ can safely send one share to $P_2$, as long as $P_1$ keeps the other share
 
 Our $n$-bit addition protocol generates a \langname source file for a given bitwidth. In our evaluation, we test several different bitwidths to examine the effect of the size of each party's view on the scalability and bug-finding capability of \toolname.
 
+\begin{figure*}
+  \centering
+  \newcommand{\gsize}{.45\textwidth}
+\begin{tabular}{c| c c}
+    \hline\hline
+  & \textbf{OT-Based (GMW)} & \textbf{Beaver Triple-Based}\\
+    \hline\hline
+  \rotatebox{90}{\phantom{hellohello}$n$-bit addition}
+  & \includegraphics[width=\gsize]{graphs/security_adder_gmw_128_1024.pdf}
+                 & \includegraphics[width=\gsize]{graphs/security_adder_beaver_128_1024.pdf} \\
+    \hline
+  \rotatebox{90}{\phantom{hel}$n$-bit less-than comparison}
+  & \includegraphics[width=\gsize]{graphs/security_less_than_gmw_128_1024.pdf}
+                 & \includegraphics[width=\gsize]{graphs/security_less_than_beaver_128_1024.pdf} \\
+    \hline
+  \rotatebox{90}{\phantom{h}$n$-bit Beaver triple generation}
+  & \includegraphics[width=\gsize]{graphs/security_beaver_triple_gen_gmw_128_1024.pdf}
+                 & \includegraphics[width=\gsize]{graphs/security_beaver_triple_gen_beaver_128_1024.pdf} \\
+    \hline
+    \hline
+\end{tabular}
+\caption{Experimental results: ability to detect security bugs.}
+\end{figure*}
+
 \paragraph{Oblivious Transfer.}
 Oblivious transfer~\cite{todo} (OT) is a 2-party protocol that allows one party ($R$, the \emph{receiver}) to select one out of several secret inputs provided by the other party ($S$, the \emph{sender}). In 1-out-of-2 OT, $S$ provides 2 secret inputs $x_0$ and $x_1$ and $R$ provides a secret \emph{selection bit} $b$. If $b=0$, $R$ receives $x_0$; if $b=1$, $R$ receives $x_1$. $R$ does not learn anything about the not-selected secret, and $S$ does not learn which secret $R$ selected. This idea can be extended to 1-out-of-$n$ OT by extending the selection bit $b$ to a $\log_2(n)$-bit string.
 %
@@ -617,6 +641,29 @@ Another MPC protocol for evaluating circuits also uses additive shares to hold w
 Our empirical evaluation demonstrates \toolname's ability to detect bugs in secure protocols.
 To answer RQ1, we generate \emph{random protocols} of varying sizes, and evaluate \toolname's ability to show they are insecure. The details appear in Section~\ref{sec:experiment-1:-random}. To answer RQ2, we evaluate \toolname on the case study protocols described in Section~\ref{sec:case-study-protocols}. The details appear in Section~\ref{sec:experiment-2:-real}. In both cases, \toolname is able to detect insecurity in the target protocols in under a minute.
 
+\begin{figure*}
+  \centering
+  \newcommand{\gsize}{.45\textwidth}
+\begin{tabular}{c| c c}
+    \hline\hline
+  & \textbf{OT-Based (GMW)} & \textbf{Beaver Triple-Based}\\
+    \hline\hline
+  \rotatebox{90}{\phantom{hellohello}$n$-bit addition}
+  & \includegraphics[width=\gsize]{graphs/time_adder_gmw_256_2048.pdf}
+                 & \includegraphics[width=\gsize]{graphs/time_adder_beaver_256_2048.pdf} \\
+    \hline
+  \rotatebox{90}{\phantom{hel}$n$-bit less-than comparison}
+  & \includegraphics[width=\gsize]{graphs/time_less_than_gmw_256_2048.pdf}
+                 & \includegraphics[width=\gsize]{graphs/time_less_than_beaver_256_2048.pdf} \\
+    \hline
+  \rotatebox{90}{\phantom{h}$n$-bit Beaver triple generation}
+  & \includegraphics[width=\gsize]{graphs/time_beaver_triple_gen_gmw_256_2048.pdf}
+                 & \includegraphics[width=\gsize]{graphs/time_beaver_triple_gen_beaver_256_2048.pdf} \\
+    \hline
+    \hline
+\end{tabular}
+\caption{Experimental results: decision tree training time.}
+\end{figure*}
 
 \paragraph{Experiment setup.}
 In our second experiment, we evaluate \toolname's ability to detect insecurity in the real-world protocols described in Section~\ref{sec:case-study-protocols}. We run \toolname on the unmodified protocol in order to establish that the protocol is secure. Then, we mutate the protocol in several ways to introduce insecurity, and test \toolname's ability to detect it. Specifically, our mutations are:
@@ -649,54 +696,7 @@ The severity of each mutation can be tuned by adjusting the bias in the related 
 
 \section{Additional Experimental Results}
 
-% figures for the main body
-\begin{figure*}
-  \centering
-  \newcommand{\gsize}{.45\textwidth}
-\begin{tabular}{c| c c}
-    \hline\hline
-  & \textbf{OT-Based (GMW)} & \textbf{Beaver Triple-Based}\\
-    \hline\hline
-  \rotatebox{90}{\phantom{hellohello}$n$-bit addition}
-  & \includegraphics[width=\gsize]{graphs/security_adder_gmw_128_1024.pdf}
-                 & \includegraphics[width=\gsize]{graphs/security_adder_beaver_128_1024.pdf} \\
-    \hline
-  \rotatebox{90}{\phantom{hel}$n$-bit less-than comparison}
-  & \includegraphics[width=\gsize]{graphs/security_less_than_gmw_128_1024.pdf}
-                 & \includegraphics[width=\gsize]{graphs/security_less_than_beaver_128_1024.pdf} \\
-    \hline
-  \rotatebox{90}{\phantom{h}$n$-bit Beaver triple generation}
-  & \includegraphics[width=\gsize]{graphs/security_beaver_triple_gen_gmw_128_1024.pdf}
-                 & \includegraphics[width=\gsize]{graphs/security_beaver_triple_gen_beaver_128_1024.pdf} \\
-    \hline
-    \hline
-\end{tabular}
-\caption{Experimental results.}
-\end{figure*}
 
-\begin{figure*}
-  \centering
-  \newcommand{\gsize}{.45\textwidth}
-\begin{tabular}{c| c c}
-    \hline\hline
-  & \textbf{OT-Based (GMW)} & \textbf{Beaver Triple-Based}\\
-    \hline\hline
-  \rotatebox{90}{\phantom{hellohello}$n$-bit addition}
-  & \includegraphics[width=\gsize]{graphs/time_adder_gmw_256_2048.pdf}
-                 & \includegraphics[width=\gsize]{graphs/time_adder_beaver_256_2048.pdf} \\
-    \hline
-  \rotatebox{90}{\phantom{hel}$n$-bit less-than comparison}
-  & \includegraphics[width=\gsize]{graphs/time_less_than_gmw_256_2048.pdf}
-                 & \includegraphics[width=\gsize]{graphs/time_less_than_beaver_256_2048.pdf} \\
-    \hline
-  \rotatebox{90}{\phantom{h}$n$-bit Beaver triple generation}
-  & \includegraphics[width=\gsize]{graphs/time_beaver_triple_gen_gmw_256_2048.pdf}
-                 & \includegraphics[width=\gsize]{graphs/time_beaver_triple_gen_beaver_256_2048.pdf} \\
-    \hline
-    \hline
-\end{tabular}
-\caption{Experimental results: decision tree training time.}
-\end{figure*}
 
 
 \input{full_figures.tex}
