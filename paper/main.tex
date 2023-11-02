@@ -9,6 +9,7 @@
 \usepackage{xcolor}
 \usepackage{booktabs}
 \usepackage[hidelinks]{hyperref}
+\usepackage{natbib}
 
 \usepackage{amsthm}
 %%\usepackage{newpxtext}  %% for _e.g._ macro.
@@ -32,9 +33,9 @@
 \newcommand{\langname}{\textsc{\textbf{.}CHO}\xspace}
 \newcommand{\toolname}{\textsc{DT-SIM}\xspace}
 
-\title{Title Goes Here}
+\title{\toolname: Property-Based Testing for MPC Security}
 
-\author{First1 Last1}
+%\author{First1 Last1}
 %%\authornote{with author1 note}        %% and a great more deleted...
 
 
@@ -67,9 +68,9 @@
 \begin{abstract}
   Formal methods for guaranteeing that a protocol satisfies a cryptographic security definition have advanced substantially,
   but such methods are still labor intensive and the need remains for an automated tool that can positively identify an insecure protocol.
-  We show that the philosophy of property-based-testing, \textit{"run it a bunch of times and see if it breaks"},
-  is at least somewhat feasible in a cryptographic setting.
-  We specifically target Secure Multi-Party Computation, because formal methods targeting this security definition for bit-model implementations
+  In this work, we demonstrate that property-based testing, \textit{"run it a bunch of times and see if it breaks"},
+  is effective for detecting security bugs in secure protocols.
+  We specifically target Secure Multi-Party Computation (MPC), because formal methods targeting this security definition for bit-model implementations
   are particularly difficult.
   Using results from the literature for Probabilistic Programming Languages and statistical inference, we devise a test that can
   detect various flaws in a bit-level implementation of an MPC protocol.
@@ -81,39 +82,50 @@
 
 \section{Introduction}
 
-\dots  %% TODO: intorduction per se?
+%\subsection{Motivation}
 
-\subsection{Motivation}
-
-As in all kinds of engineering; in cryptography it is critical to know that the thing you are building actually does what you intend.
-In cryptography however, the intended behavior is often expressed as a negation,
-\eg secret information should \textit{never} be derivable from such'n'such surface of the system.
-Observing of the system's behavior provides limited evidence that the system is actually secure in the intended ways.
-Formal proofs of security are a popular and well-suited solution to this problem, however:
-
+Secure multiparty computation (MPC) protocols~\cite{evans2018pragmatic} allow a group of mutually distrusting parties to compute a shared function over distributed data without revealing that data. The security of MPC protocols is often expressed as a negation,
+\eg secret information should \textit{never} be derivable from an adversary's observations of the system.
+Unfortunately, testing generally provides limited evidence that the system is actually secure in the intended ways; formal proofs of security are effective, but are tedious to construct and require significant expertise. As a result:
+%
 \begin{itemize}
-    \item As consumers, we are concerned that a great deal of cyber-security software has been and is being produced without formal verification.
-    \item As engineers, we would like to not waste time attempting to prove the security of systems which, unbeknownst to us, are not actually secure.
-    \item As product managers, we would like to have sanity checks
-          that complicated software systems actually have the security properties their constituent source-code claims to be proven to have.
+\item Most implementations of MPC protocols are not formally verified.
+\item Formal verification tools are challenging to use, and engineers can waste significant time trying to prove properties of insecure implementations.
+\item Even for formally-verified software, we would like to have sanity checks
+  that protocol implementations actually have the security properties their constituent source-code claims to be proven to have.
 \end{itemize}
 
-In this work we particularly focus on Secure Multi-Party Computation (MPC),
-a cryptographic primitive with wide-ranging applications but frustrating performance limitations.
-Substantial work has going into improving the performance of MPC systems [TODO: citation].
-Additionally, in some cases performance can be improved by using a bespoke protocol instead of a general-purpose MPC system [do we have any evidence of this?].
-We accelerate this work by providing a tool, comparable to a property-based test,
-for conveniently spot-checking the security of an MPC implementation.
+We present \toolname, an \emph{automatic}, \emph{property-based testing} tool for MPC security. \toolname works by running the protocol thousands of times, then using a statistical independence test to detect security bugs. Our approach is motivated by the success of property-based testing (via tools like \textsc{QuickCheck}) as an approach for finding bugs in software~\cite{fink1997property, claessen2000quickcheck, paraskevopoulou2015foundational}. Unlike previous applications of property-based testing, however, \toolname attempts to falsify a \emph{probabilistic hyperproperty} of the target protocol---a much more challenging setting.
 
-\subsection{Contributions}
+\toolname works by defining security in terms of conditional independence, then performing a statistical test which attempts to falsify this conditional independence property. In MPC protocols, the inputs of the honest parties should be independent of the \emph{views} (i.e. the observed message values) of the corrupt parties, conditioned on the protocol's output. Conditioning on the protocol's output is vital for the security definition, since it allows the protocol to \emph{intentionally} leak some information about the inputs via the output---as nearly all MPC protocols do. Manual security proofs for MPC protocols demonstrate this conditional independence property by constructing a \emph{simulator} that ``fakes'' the corrupt parties' views using only the protocol's output.
 
-In this work we present and evaluate a statistical test of the security of MPC protocols.
-First we show how MPC security relates to inference and equivalence of probabilistic distributions,
-and then we demonstrate that existing tests of distributional equivalence can, with minor modification, be used to refute MPC security.
-Our tool is adaptable to the wide range of cryptographic security properties that can be defined in terms of distributional equivalence,
-and our tool is applicable to any software system that
-A) can be run 10k-1M times without great inconvenience, and
-B) allows certain intermediate values (of which consumed randomness is the least convenient) to be captured for analysis.
+This formulation of security as conditional independence puts MPC security out of reach of all automated verification tools (and many manual ones). While automated tools have been used to verify security in cryptographic protocols~\cite{gancher2023owl, barthe2019probabilistic, darais2019language, fournet2011information}  (e.g. key exchange protocols), these tools are limited to protocols whose \emph{outputs reveal nothing} to the adversary. They are capable of showing independence, but not the kind of \emph{conditional} independence required for MPC security. Recent manual approaches could be used to verify MPC security~\cite{li2023lilac, gancher2023core, haagh2018computer}, but require manual proof.
+
+\toolname is designed to fill the same role as tools like \textsc{QuickCheck}: it can be used to quickly and automatically detect many classes of bugs in MPC protocol implementations, without requiring the programmer to spend time building a manual security proof. We have implemented \toolname and tested it empirically on several real-world MPC protocols and on hundreds of randomly-generated protocols; our experimental results suggest that \toolname is capable of scaling to realistic protocols and detecting many security bugs, despite the challenging setting.
+
+% In this work we particularly focus on Secure Multi-Party Computation (MPC),
+% a cryptographic primitive with wide-ranging applications but frustrating performance limitations.
+% Substantial work has going into improving the performance of MPC systems [TODO: citation].
+% Additionally, in some cases performance can be improved by using a bespoke protocol instead of a general-purpose MPC system [do we have any evidence of this?].
+% We accelerate this work by providing a tool, comparable to a property-based test,
+% for conveniently spot-checking the security of an MPC implementation.
+
+\paragraph{Contributions.}
+In summary, our contributions are:
+%
+\begin{itemize}
+\item We show how to define MPC security in terms of conditional independence, enabling the use of independence testing tools for checking MPC security.
+\item We introduce \toolname, the first property-based testing tool for MPC security.
+\item We conduct an empirical evaluation of \toolname, demonstrating its ability to scale to realistic MPC protocols and detect security bugs.
+\end{itemize}
+  
+% In this work we present and evaluate a statistical test of the security of MPC protocols.
+% First we show how MPC security relates to inference and equivalence of probabilistic distributions,
+% and then we demonstrate that existing tests of distributional equivalence can, with minor modification, be used to refute MPC security.
+% Our tool is adaptable to the wide range of cryptographic security properties that can be defined in terms of distributional equivalence,
+% and our tool is applicable to any software system that
+% A) can be run 10k-1M times without great inconvenience, and
+% B) allows certain intermediate values (of which consumed randomness is the least convenient) to be captured for analysis.
 
 \section{Background}
 
@@ -267,10 +279,10 @@ TODO: Is efficient inference really necessary? The conditional independence test
 
 In industry the normal way to see if a program satisfies some desired property is to run it and see what it does.
 Sometimes this is done with a select handful of inputs or configurations,
-but non-deterministic programs are better evaluated with \termOfArt{property-based testing},
+but non-deterministic programs are better evaluated with \termOfArt{property-based testing}~\cite{fink1997property, claessen2000quickcheck, paraskevopoulou2015foundational},
 in which the program is run with many arbitrary (but not necessarily random) configurations.
 Property-based testing is a popular paradigm for testing code in industry;
-the classic Haskell framework QuickCheck [citation] % https://www.cse.chalmers.se/~rjmh/QuickCheck/
+the classic Haskell framework \textsc{QuickCheck}~\cite{claessen2000quickcheck}
 is still in use and has been ported to various other languages.
 
 At face value, property-based testing doesn't generally extend to hyper-properties,
