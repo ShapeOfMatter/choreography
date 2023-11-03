@@ -82,7 +82,7 @@
   detect various flaws in a bit-level implementation of an MPC protocol.
   The test is grey-box; it requires only transcripts of randomness consumed by the protocol and of the inputs, outputs, and messages.
   It successfully detects several different mistakes and biases introduced into two different implementations of the classic GMW protocol.
-  Applied to thousands of randomly generated protocols, it identifies nearly all of them as insecure.
+  Applied to hundreds of randomly generated protocols, it identifies nearly all of them as insecure.
   We also include an analysis of the parameters of the test, and discussion of what makes detection of MPC (in)security difficult.
 \end{abstract}
 
@@ -101,11 +101,11 @@ Unfortunately, testing generally provides limited evidence that the system is ac
 
 We present \toolname, an \emph{automatic}, \emph{property-based testing} tool for MPC security. \toolname works by running the protocol thousands of times, then using a statistical independence test to detect security bugs. Our approach is motivated by the success of property-based testing (via tools like \textsc{QuickCheck}) as an approach for finding bugs in software~\cite{fink1997property, claessen2000quickcheck, paraskevopoulou2015foundational}. Unlike previous applications of property-based testing, however, \toolname attempts to falsify a \emph{probabilistic hyperproperty} of the target protocol---a much more challenging setting.
 
-\toolname works by defining security in terms of conditional independence, then performing a statistical test which attempts to falsify this conditional independence property. In MPC protocols, the inputs of the honest parties should be independent of the \emph{views} (i.e. the observed message values) of the corrupt parties, conditioned on the protocol's output. Conditioning on the protocol's output is vital for the security definition, since it allows the protocol to \emph{intentionally} leak some information about the inputs via the output---as nearly all MPC protocols do. Manual security proofs for MPC protocols demonstrate this conditional independence property by constructing a \emph{simulator} that ``fakes'' the corrupt parties' views using only the protocol's output.
+\toolname works by defining security in terms of conditional independence, then performing a statistical test which attempts to falsify this conditional independence property. In MPC protocols, the inputs of the honest parties should be independent of the \emph{views} (\ie{} the observed message values) of the corrupt parties, conditioned on the protocol's output. Conditioning on the protocol's output is vital for the security definition, since it allows the protocol to \emph{intentionally} leak some information about the inputs via the output---as nearly all MPC protocols do. Manual security proofs for MPC protocols demonstrate this conditional independence property by constructing a \emph{simulator} that ``fakes'' the corrupt parties' views using only the protocol's output.
 
-This formulation of security as conditional independence puts MPC security out of reach of all automated verification tools (and many manual ones). While automated tools have been used to verify security in cryptographic protocols~\cite{gancher2023owl, barthe2019probabilistic, darais2019language, fournet2011information}  (e.g. key exchange protocols), these tools are limited to protocols whose \emph{outputs reveal nothing} to the adversary. They are capable of showing independence, but not the kind of \emph{conditional} independence required for MPC security. Recent manual approaches could be used to verify MPC security~\cite{li2023lilac, gancher2023core, haagh2018computer}, but require manual proof.
+This formulation of security as conditional independence puts MPC security out of reach of all automated verification tools (and many manual ones). While automated tools have been used to verify security in cryptographic protocols~\cite{gancher2023owl, barthe2019probabilistic, darais2019language, fournet2011information}  (\eg{} key exchange protocols), these tools are limited to protocols whose \emph{outputs reveal nothing} to the adversary. They are capable of showing independence, but not the kind of \emph{conditional} independence required for MPC security. Recent manual approaches could be used to verify MPC security~\cite{li2023lilac, gancher2023core, haagh2018computer}, but require manual proof.
 
-\toolname is designed to fill the same role as tools like \textsc{QuickCheck}: it can be used to quickly and automatically detect many classes of bugs in MPC protocol implementations, without requiring the programmer to spend time building a manual security proof.
+\toolname is designed to fill the same role as tools like \textsc{QuickCheck}: it can be used to quickly and automatically detect many classes of bugs in MPC protocol implementations, without investing the user's time in a manual security proof.
 Using \toolname requires only that key runtime values can be captured during program execution;
 it's agnostic to the language and many other details about the subject program.
 We have implemented \toolname and tested it empirically on several real-world MPC protocols and on hundreds of randomly-generated protocols; our experimental results suggest that \toolname is capable of scaling to realistic protocols and detecting many security bugs, despite the challenging setting.
@@ -135,7 +135,9 @@ In summary, our contributions are:
 Secure Multi-Party Computation (MPC or SMPC, depending on the text)
 is a cryptographic process that allows some group of participating parties or machines
 to compute a function that depends on all of their private inputs,
-without any of them learning anything except the final result.
+without any of them learning anything except the final result\footnote{
+    It is possible for each party to have a distinct final result.
+}.
 Implementations that work on arbitrary functions (representable as circuit computations in some field)
 have existed since 1986~\cite{yao1986generate}, % https://ieeexplore.ieee.org/document/4568207
 but their use by the public is limited by their performance.
@@ -248,7 +250,9 @@ and examine the entire rest of the protocol as context.
 
 \subsection{Inference in PPLs}
 
-Since MPC security can be framed as a test of conditional independence, \termOfArt{probabilistic programming languages} (PPLs) with efficient inference and independence tests could be used to verify MPC security.
+Since MPC security can be framed as a test of conditional independence
+(Section~\ref{sec:algorithm}),
+\termOfArt{probabilistic programming languages} (PPLs) with efficient inference and independence tests could hypothetically be used to verify MPC security.
 %
 A PPL is a language that provides stochastic non-deterministic behavior as a language primitive
 and provides meta-theory or auxiliary tooling to reason about the resulting distributions of program behavior.
@@ -263,7 +267,7 @@ For application to the subject of MPC protocols, a PPL would need to handle the 
     will sample at runtime from the best floating-point approximation the machine can provide
     of the uniform distribution on $\mathbb{R}_{(0,1]}$
 }, and
-(2) The secret inputs of the honest parties are not stochastic at all, but the adversary can be asked to provide a distribution over
+(2) The secret inputs of the honest parties are not stochastic but the adversary can be asked to provide a distribution over
 possible secrets representing their prior belief so that the secret inputs can also be modeled as random variables.
 
 Hypothetically, supposing a protocol in a PPL providing a multivariate distribution over an appropriate subset of all runtime values,
@@ -316,7 +320,7 @@ we also use D-Trees for \toolname.
 In principal, \textit{any} ML classifier would be ok to use; the choice is partly an engineering question
 and partly a judgment call about what kinds of systems will be best able to discern patterns in the views of the subject protocol.
 
-\subsection{The \toolname Algorithm}
+\subsection{The \toolname Algorithm}\label{sec:algorithm}
 
 If a simulator $\mathtt{SIM}$ exists for a protocol Π implementing functionality F,
 and we suppose fixed corrupt inputs $\vec{x}_C$,
@@ -468,7 +472,7 @@ and its own tape for output bits.
 \langname supports macros, but they are extremely limited.
 
 \langname supports 1-of-N oblivious transfer as a primitive operation.
-Oblivious transfer~\cite{kilian1988founding} (OT) is a 2-party protocol that allows one party ($R$, the \emph{receiver}) to select one out of several secret inputs provided by the other party ($S$, the \emph{sender}). In 1-out-of-2 OT, $S$ provides 2 secret inputs $x_0$ and $x_1$ and $R$ provides a secret \emph{selection bit} $b$. If $b=0$, $R$ receives $x_0$; if $b=1$, $R$ receives $x_1$. $R$ does not learn anything about the not-selected secret, and $S$ does not learn which secret $R$ selected. This idea can be extended to 1-out-of-$n$ OT by extending the selection bit $b$ to a $\log_2(n)$-bit string.
+Oblivious transfer (OT)~\cite{kilian1988founding} is a 2-party protocol that allows one party ($R$, the \emph{receiver}) to select one out of several secret inputs provided by the other party ($S$, the \emph{sender}). In 1-out-of-2 OT, $S$ provides 2 secret inputs $x_0$ and $x_1$ and $R$ provides a secret \emph{selection bit} $b$. If $b=0$, $R$ receives $x_0$; if $b=1$, $R$ receives $x_1$. $R$ does not learn anything about the not-selected secret, and $S$ does not learn which secret $R$ selected. This idea can be extended to 1-out-of-$n$ OT by extending the selection bit $b$ to a $\log_2(n)$-bit string.
 %
 Oblivious transfer is a building block for many other protocols, including the GMW protocol described later.
 
@@ -516,7 +520,6 @@ and ran \toolname against each of them with a grid of different parameters.
 
 
 \begin{figure*}
-  \label{fig:sankey}
   \centering
   \newcommand{\gsize}{.9\textwidth}
 \begin{tabular}{c}
@@ -526,10 +529,10 @@ and ran \toolname against each of them with a grid of different parameters.
     \hline
 \end{tabular}
 \caption{Experimental results: performance on random protocols under increasing test power.}
+\label{fig:sankey}
 \end{figure*}
 
 \begin{figure}
-  \label{fig:linear-time}
   \centering
   \newcommand{\gsize}{.38\textwidth}
 \begin{tabular}{c}
@@ -539,11 +542,11 @@ and ran \toolname against each of them with a grid of different parameters.
     \hline
 \end{tabular}
 \caption{Experimental results: runtime with increasing test power.}
+\label{fig:linear-time}
 \end{figure}
 
 
 \begin{figure*}
-  \label{fig:cube-search}
   \centering
   \newcommand{\gsize}{.45\textwidth}
 \begin{tabular}{c | c c}
@@ -559,6 +562,7 @@ and ran \toolname against each of them with a grid of different parameters.
     \hline
 \end{tabular}
 \caption{Experimental results: trade-offs in power and runtime under different test parameters.}
+\label{fig:cube-search}
 \end{figure*}
 
 \paragraph{Results.}
@@ -577,7 +581,7 @@ More importantly, the runtime scales linearly with the amount of data used in th
 
 Figure~\ref{fig:cube-search} shows the individual effects of \texttt{iters}, \texttt{trainN}, and \texttt{testN} on \toolname's power and runtime.
 Each 3D heatmap shows aggregate data for 200 randomly generated \toolname files.
-Because is mostly driven by the amount of data consumed ($\texttt{iters} \cdot (\texttt{trainN} + \texttt{testN})$),
+Because runtime is mostly driven by the amount of data consumed ($\texttt{iters} \cdot (\texttt{trainN} + \texttt{testN})$),
 all three affect runtime linearly.
 To maximize the granularity of the test-power analysis, we calculate a score for each combination of parameters,
 where apparently-secure programs count for 2 points,
@@ -696,7 +700,7 @@ We evaluate three functions, which we express as binary circuits for two parties
 
 We run \toolname on the unmodified protocol in order to establish the protocol's security
 and show that \toolname doesn't flag secure protocols as insecure.
-Then, we mutate the protocol in several ways to introduce security bugs, and test \toolname's ability to detect these bugs. Specifically, our mutations are:
+Then we mutate the protocol in several ways to introduce security bugs and test \toolname's ability to detect these bugs. Specifically, our mutations are:
 %
 \begin{itemize}
 \item \textbf{Biased sharing}: uses biased randomness to construct secret shares of honest party inputs.
@@ -713,13 +717,13 @@ The severity of each mutation can be tuned by adjusting the bias in the related 
 The results appear in Figures~\ref{fig:results_security} and~\ref{fig:results_training_time}. For the results in Figure~\ref{fig:results_security}, we set the number of iterations to 128 and the training set size to 1024. The results are similar for other settings; additional experimental results appear in Appendix~\ref{sec:addit-exper-results}.
 
 \paragraph{Detecting security bugs.}
-\toolname is able to detect most security bugs in our evaluation, but interpreting its results requires care. \toolname detects \textbf{biased sharing} bugs in nearly all cases: the associated $p$-values are universally close to 0 in all six cases. The one exception is the $n$-bit adder for small $n$, where associated $p$ values are close to 1. This is likely due to the \emph{vacuous security} of the $n$-bit adder: for small bitwidths, the decision trees are able to reconstruct the honest party's inputs using only information from the ideal functionality, rendering \emph{any} protocol secure. For larger bitwidths, the decision trees are no longer able to perform this reconstruction, and the protocols are classified as insecure. The other functions---which are not vacuously secure---do not display this behavior.
+\toolname is able to detect most security bugs in our evaluation, but interpreting its results requires care. \toolname detects \textbf{biased sharing} bugs in nearly all cases: the associated $p$-values are universally close to 0 in all six cases. The one exception is the $n$-bit adder for small $n$, where associated $p$ values are close to 1. This is likely due to the \emph{vacuous security} of the $n$-bit adder: for small bitwidths, the decision trees are able to reconstruct the honest party's inputs using only information from the ideal functionality, rendering \emph{any} protocol secure. For larger bitwidths, the decision trees are no longer able to perform this reconstruction, and the protocols are classified as insecure.
 
-\toolname detects \textbf{biased AND} bugs in most of the GMW-based protocols, but struggles to do so in the case of Beaver-triple-based protocols. Due to the use of multiplication triples, taking advantage of the leakage from biased AND gates in this case is much more difficult than in the GMW case. These results suggest that \toolname will likely have difficulty detecting bugs that require significant ``backwards computation'' to leverage the leaked information. 
+\toolname detects \textbf{biased AND} bugs in most of the GMW-based protocols, but struggles to do so in the case of Beaver-triple-based protocols. Due to the use of multiplication triples, taking advantage of the leakage from biased AND gates in this case is much more difficult than in the GMW case. These results suggest that \toolname will likely have difficulty detecting bugs that require significant ``backwards computation'' to leverage the leaked information.
 
 \toolname detects \textbf{accidental secret} bugs in the same cases as biased sharing bugs, for the same reasons.
 
-\toolname detects \textbf{accidental gate} bugs in the $n$-bit less-than comparison only in the OT-based GMW framework.
+\toolname detects \textbf{accidental gate} bugs in the $n$-bit-less-than comparison only in the OT-based framework.
 In the Beaver-triple framework, we hypothesize that the decision trees are not capable of the ``backwards computation''
 required to leverage the leaked information
 
@@ -815,7 +819,7 @@ Since differential privacy is only concerned with program inputs and outputs,
 the dimensionality of the problem is somewhat smaller than MPC.
 
 Our work builds directly on that of Chalupka et al.~\cite{chalupka2018fast}
-who show that batches of ML classifiers (in practice, decision trees, because they're light-weight) can be used to check conditional independence.
+who show that batches of ML classifiers can be used to check conditional independence.
 Specifically, if decision trees (D-Trees) trained on random variables $A$ and $C$
 do better at predicting the value of a random variable $B$ than D-Trees trained only on $C$,
 then $A$ and $B$ are not independent conditioned on $C$.
@@ -825,13 +829,13 @@ but in our adaptation we use fresh program traces for everything.
 
 \section{Future Work}
 
-Some further works is needed to turn \toolname into a deploy-able tool;
+Some further work is needed to turn \toolname into a deploy-able tool;
 our experiments so far are not sufficient to calculate sensible default settings,
 and we believe some changes to the way the data is ingested and handled by the tool could improve efficiency.
 
 There are also variations on the core concept of \toolname that we believe are worth exploring.
 Decision trees are not the only candidate for the underlying ML model, and our evaluation suggests that they are incapable of performing some of the ``backwards computation'' needed to demonstrate insecurity;
-a more capable model (\eg{} a neural network) may be more capable of detecting these kinds of security bugs.
+a deeper model (\eg{} a neural network) may be more capable of detecting these kinds of security bugs.
 Other cryptographic properties besides MPC can likely be framed in terms of conditional independence;
 and so would be amenable to similar tests.
 Finally, because end-to-end static analysis of MPC protocols has proven so difficult,
