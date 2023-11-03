@@ -33,6 +33,12 @@
 \newcommand{\langname}{\textsc{\textbf{.}CHO}\xspace}
 \newcommand{\toolname}{\textsc{DT-SIM}\xspace}
 
+\newcommand{\mynote}[2]
+    {{\color{red} \fbox{\bfseries\sffamily\scriptsize#1}
+    {\small$\blacktriangleright$\textsf{\emph{#2}}$\blacktriangleleft$}}~}
+%\newcommand{\mynote}[2]{}
+\newcommand{\todo}[1]{\mynote{TODO}{#1}}
+
 \title{\toolname: Property-Based Testing for MPC Security}
 
 %\author{First1 Last1}
@@ -131,13 +137,13 @@ is a cryptographic process that allows some group of participating parties or ma
 to compute a function that depends on all of their private inputs,
 without any of them learning anything except the final result.
 Implementations that work on arbitrary functions (representable as circuit computations in some field)
-have existed since 1986~\cite{yao86}, % https://ieeexplore.ieee.org/document/4568207
+have existed since 1986~\cite{yao1986generate}, % https://ieeexplore.ieee.org/document/4568207
 but their use by the public is limited by their performance.
 Some performance limitations are fundamental to the problem
 (roughly, every branch of the computation must be executed so that the control-flow does not itself leak information),
 but techniques have been found to improve performance somewhat.
 
-The traditional expression of MPC assumes a pre-determined function F, "the functionality",
+The traditional expression of MPC assumes a pre-determined function F, the \emph{functionality},
 mapping the tuple of all participants' input vectors to the respective tuple of output vectors
 (or to distributions of outputs, if F is non-deterministic).
 In an \termOfArt{ideal world}, a trusted third party (the \termOfArt{ideal functionality}) would accept input messages
@@ -146,7 +152,7 @@ A \termOfArt{real world} protocol Π is said to \textit{correctly} implement F i
 Π results in all parties getting the same outputs as they would have in the ideal world.
 The \textit{security} of Π is expressed in terms of a particular threat model and the participants' "\termOfArt{views}".
 
-\paragraph{Passive Security}
+\textbf{Passive security}
 supposes a computationally-bounded adversary
 that can see everything happening inside a fixed subset of the participating machines.
 This adversary cannot cause the parties to deviate from the protocol Π in any way;
@@ -161,6 +167,7 @@ The \termOfArt{real world view}, $\mathsf{Real}_P(Π, \vec{x})$, of a party P is
 its inputs, outputs, all messages it receives, and all the bits of random tape it uses.
 Both these concepts extend naturally to lists of parties.
 
+\todo{this is the first place the simulator is mentioned, but it's not described}
 \begin{definition}[Passive MPC Security]\label{def:passive-mpc}
     A protocol Π,
     involving participating parties P,
@@ -202,11 +209,11 @@ In other words, we define F to be whatever mapping results from the execution of
 This present work describes a system for property-based testing of MPC \textit{security};
 a corresponding test of \textit{correctness} is trivial for any pre-defined F.
 
-\paragraph{Active Security}
+\textbf{Active security}
 (sometimes "malicious security")
 supposes a computationally bounded adversary that can cause corrupted machines to take arbitrary actions:
 breaking the choreography,
-forging messages (to such extent as that's actually possible),
+forging messages,
 lying about computation results,
 and/or playing along with the protocol for any period of time.
 In contrast to passive adversaries, which are weaker than the threat models most real programmers worry about,
@@ -231,20 +238,16 @@ On the other hand, this spectrum doesn't capture the assumptions about the adver
 if inverting the functionality F is NP-hard, then the protocol is \textit{not} vacuously secure, even if F is a bijection.
 
 \paragraph{Non-interference.}
-While MPC can be expressed as a kind of non-interference property, this is only somewhat useful.
+While MPC can be expressed as a kind of probabilistic non-interference property~\cite{haagh2018computer, almeida2018enforcing}, this is only somewhat useful.
 The non-interference can only be meant within the space of possible program traces \textit{posterior to the output}.
-Trying to avoid such subtleties in the non-interference property by providing a correctly constrained \texttt{reveal} operator
-isn't promising because constraints on \texttt{reveal} would need to recapitulate the original question of security
+Trying to avoid such subtleties in the non-interference property by providing a correctly constrained declassification operator
+does not avoid this problem: constraints on declassification would need to recapitulate the original question of security
 and examine the entire rest of the protocol as context.
-
-TODO: maybe state it explicitly with the conditioning? Then we can say that no system can capture that property.
 
 \subsection{Inference in PPLs}
 
-Efficient inversion of programs and fragments of programs turns out to be important for determining if a protocol satisfies MPC security.
-Since MPC protocols are probabilistic, what we really need is efficient posterior inference of program inputs in a
-\termOfArt{probabilistic programming language} (PPL).
-
+Since MPC security can be framed as a test of conditional independence, \termOfArt{probabilistic programming languages} (PPLs) with efficient inference and independence tests could be used to verify MPC security.
+%
 A PPL is a language that provides stochastic non-deterministic behavior as a language primitive
 and provides meta-theory or auxiliary tooling to reason about the resulting distributions of program behavior.
 In particular, PPLs commonly have semantics defined in terms of transformations on distributions,
@@ -253,12 +256,12 @@ inference and sampling. Since even representing a fully-general multivariate dis
 PPLs typically restrict the programs and/or distributions they can handle.
 
 For application to the subject of MPC protocols, a PPL would need to handle the two different kinds of uncertainty facing a hypothetical adversary:
-1) Random values generated (by any party) at runtime have known distributions\footnote{
-    \eg{} in python \texttt{secrets.SystemRandom().random()}
+(1) Random values generated (by any party) at runtime have known distributions\footnote{
+    \eg{} in Python \texttt{secrets.SystemRandom().random()}
     will sample at runtime from the best floating-point approximation the machine can provide
     of the uniform distribution on $\mathbb{R}_{(0,1]}$
-}.
-2) The secret inputs of the honest parties are not stochastic at all, but the adversary can be asked to provide a distribution over
+}, and
+(2) The secret inputs of the honest parties are not stochastic at all, but the adversary can be asked to provide a distribution over
 possible secrets representing their prior belief so that the secret inputs can also be modeled as random variables.
 
 Hypothetically, supposing a protocol in a PPL providing a multivariate distribution over an appropriate subset of all runtime values,
@@ -267,15 +270,16 @@ if it were possible to efficiently infer and sample from the real-world views
 \textit{posterior to} the corrupt outputs (and corrupt inputs),
 then that would suffice as a simulator
 \textit{if and only if} the inferred distribution were independent of the adversary's choice of prior distribution for the honest secrets.
-So a direct test of MPC security (or a useful over-approximation) could be built from
-A) a language meta-theory guarantee that such posterior inference and sampling would be efficient,
-B) a test or guarantee of independence between the posterior view distribution and the exponentially-many parameters
+
+A direct test of MPC security via a PPL would require \emph{both}
+(A) a language meta-theory guarantee that such posterior inference and sampling would be efficient, \emph{and}
+(B) a test or guarantee of independence between the posterior view distribution and the exponentially-many parameters
 of the prior distribution of honest secrets\footnote{
     Presumably such process would need to leave those parameters implicit.
     Attempting to represent the adversary's prior beliefs more compactly would not produce a valid proof or test of security.
-}, and
-C) the ability to quantify (A) and (B) over all possible corrupt secrets or public inputs.
-Such a system is not necessarily impossible, but we have so far failed to build it.
+}, as well as
+(C) the ability to quantify (A) and (B) over all possible corrupt secrets or public inputs, presumably by handling them symbolically.
+While some PPLs can statically verify independence properties~\cite{gorinova2021conditional}, none can verify the kind of \emph{conditional} independence required for MPC security. Lilac~\cite{li2023lilac} provides a separation logic for reasoning about conditional independence, but is not automated.
 
 \subsection{Property-based testing}
 
@@ -294,87 +298,6 @@ but the sensitivity of the test quickly decays and the logistics of setting up t
 Furthermore, when the property to be tested is over distributions of traces,
 the techniques used by good property-based testing frameworks to efficiently find interesting cases are not appropriate.
 
-
-\section{Related Work}
-
-\subsection{Formal-methods for cryptography}
-Although a useful language-driven test for MPC security remains out of reach,
-a variety of useful work aproaches the subject from different directions.
-
-Haagh et al.~\cite{haagh2018computer} % Computer-aided proofs for multiparty computation with active security
-use EasyCrypt to manually show the security of GMW.
-Their definitions generalize to protocols with efficiently invertible functionalities.
-They model MPC as a non-interference property: Honest secrets are non-interfering on the corrupt views conditioned on the corrupt outputs.
-If their system could be automated and paired with language constraints to ensure invertibility,
-then it could apply to many, but certainly not all, use cases.
-
-Barthe et al.~\cite{barthe2019probabilistic} % https://arxiv.org/abs/1907.10708 A Probabilistic Separation Logic
-give a framework for probabilistic reasoning and show that it can be used to prove security of additive secret sharing.
-Even if the technique could be automated, it's unclear how it would generalize to any other kind of protocol.
-
-Gancher et al.~\cite{gancher2023core} % https://dl.acm.org/doi/pdf/10.1145/3571223
-give a powerful language system that can check if one protocol is a valid simulator of another,
-and show that it works on existing MPC protocols like GMW.
-The user of the system needs to write a second protocol
-representing the composition of the ideal-world functionality and an explicit $\mathtt{SIM}$,
-and then build a high-level proof of the equivalence in the provided equational logic.
-
-The \textsc{Wysteria} language~\cite{rastogi2014wysteria} % https://www.ieee-security.org/TC/SP2014/papers/Wysteria_c_AProgrammingLanguageforGeneric,Mixed-ModeMultipartyComputations.pdf
-gives fine-grained integration of MPC as a language primitive, to help a larger program use it efficiently.
-Their system assumes (at least one) secure implementation of MPC on circuits.
-
-$\lambda_\textbf{obliv}$~\cite{darais2019language} %
-gives a type system that ensures uniform and independent randomness of key values throughout a program.
-Their system could be adapted to ensure perfect uniformity of parties' views in a protocol,
-but this would of course prevent any non-vacuous functionality from being implemented.
-
-\textsc{Owl}~\cite{gancher2023owl} % https://eprint.iacr.org/2023/473.pdf
-gives a type system guaranteeing non-interference with an (extensible) selection of cryptographic operations as language primitives.
-They can type-check convoluted uses of operations like encryption and hashing, but without features for inference or inversion,
-there's no way to verify an implementation of MPC.
-
-Fournet et al.~\cite{fournet2011information} % https://www.microsoft.com/en-us/research/wp-content/uploads/2017/01/information-flow-types-for-homomorphic-encryptions-ccs11.pdf
-also use a type system to ensure safe usage of cryptographic primitives,
-but they specifically work with homomorphic encryption schemes and the various measures by which such schemes may be correct.
-Like OWL, their type system assumes a secure implementation of the encryption scheme.
-
-\subsection{PPLs for Inference}
-
-We experimented with choreography languages that translate directly into Sum Product Networks (SPNs)~\cite{poon2011sum}.
-A SPN is a directed-graph representation of a multi-variate distribution.
-They are compact, allow efficient inference, and can represent values symbolically as needed,
-so testing for conditional independence is practical.
-However, such a language cannot express any existing MPC protocols, and likely cannot express any \textit{useful} protocols,
-because if the language allowed any value to be used more than once, it would result in graphs that violate key invariants of SPNs.
-
-The \textsc{Dice} language~\cite{holtzen2020scaling} translates programs into binary decision diagrams (BDDs),
-analogous to the way we tried to translate them into SPNs.
-BDDs can represent, and do inference on, distributions that aren't representable as SPNs,
-but since the graph \textit{structure} of the BDD of a \textsc{Dice} program depends on the actual \textit{values} on which one is conditioning,
-a \textsc{Dice}-based test for the kind of conditional independence needed for MPC would scale exponentially with the input/output width of the protocol.
-
-Lilac~\cite{li2023lilac} % https://arxiv.org/abs/2304.01339
-is a program logic for reasoning about probability distributions and PPLs.
-It more expressive than the original probabilistic separation logic~\cite{barthe2019probabilistic},
-but it has not yet been applied to MPC, nor is it clear how it would be used in an automated test.
-
-\subsection{Probabilistic testing}
-
-Ding et al.~\cite{ding2018detecting} % https://arxiv.org/pdf/1805.10277.pdf
-and more recently Zhang et al.~\cite{zhang2020testing} % https://dl.acm.org/doi/10.1145/3428233
-use large samples of program executions to test for violations of differential privacy,
-showing that such techniques can work on probabilistic hyper-properties.
-Since differential privacy is only concerned with program inputs and outputs,
-the dimensionality of the problem is somewhat smaller than MPC.
-
-Our work builds directly on that of Chalupka et al.~\cite{chalupka2018fast}
-who show that batches of ML classifiers (in practice, decision trees, because they're light-weight) can be used to check conditional independence.
-Specifically, if decision trees (D-Trees) trained on random variables $A$ and $C$
-do better at predicting the value of a random variable $B$ than D-Trees trained only on $C$,
-then $A$ and $B$ are not independent conditioned on $C$.
-The test is statistical; many D-Trees are trained and any apparent advantage of the better-informed ones must be assessed for statistical significance.
-In their work the data is assumed to be permuted sub-samples of some finite pool of samples from a population,
-but in our adaptation we use fresh program traces for everything.
 
 
 \section{Statistical testing for MPC insecurity}
@@ -492,10 +415,10 @@ that any advantage of the real-world models comes from insecurity in the protoco
 
 \subsection{Implementation}
 
-Our \toolname python script consumes a stream of fixed-length bit vectors as a CSV.
+Our \toolname Python script consumes a stream of fixed-length bit vectors as a CSV.
 Annotation of which columns are available in the real and ideal worlds is provided in the header.
 The CSV is parsed and broken up as needed as a \texttt{pandas} dataframe.
-The individulal ML models are instances of \texttt{sklearn.tree.DecisionTreeClassifier},
+The individual ML models are instances of \texttt{sklearn.tree.DecisionTreeClassifier},
 and they're trained in parallel with \texttt{joblib.Parallel}.
 The D-Tree scores are inflated by $+1 \cdot 10^{-10}$ to avoid division-by-zero in the score-ratio,
 and the score distributions are compared by \texttt{scipy.stats.wilcoxon}.
@@ -823,6 +746,88 @@ For security bugs that directly reveal sensitive information (e.g. \textbf{biase
 
 \toolname is less effective for security bugs that require significant ``backwards computation'' to leverage the leaked information (e.g. \textbf{accidental gate} bugs), since decision trees are not well-suited to solving this problem. A more sophisticated model---such as a deep neural network---may be able to perform this kind of computation, but would take significantly longer to train.
 
+
+
+\section{Related Work}
+
+\subsection{Formal-methods for cryptography}
+Although automated language-based verification of MPC security is an open question,
+a variety of useful work approaches the subject from different directions.
+
+Haagh et al.~\cite{haagh2018computer} % Computer-aided proofs for multiparty computation with active security
+use EasyCrypt to manually show the security of GMW.
+Their definitions generalize to protocols with efficiently invertible functionalities.
+They model MPC as a non-interference property: Honest secrets are non-interfering on the corrupt views conditioned on the corrupt outputs.
+Their approach requires manual proof in EasyCrypt.
+
+Barthe et al.~\cite{barthe2019probabilistic} % https://arxiv.org/abs/1907.10708 A Probabilistic Separation Logic
+give a framework for probabilistic reasoning and show that it can be used to prove security of additive secret sharing.
+However, the framework is not amenable to automation.
+
+Gancher et al.~\cite{gancher2023core} % https://dl.acm.org/doi/pdf/10.1145/3571223
+give a powerful language system that can check if one protocol is a valid simulator of another,
+and show that it works on existing MPC protocols like GMW.
+The user of the system needs to write a second protocol
+representing the composition of the ideal-world functionality and an explicit $\mathtt{SIM}$,
+and then build a high-level proof of the equivalence in the provided equational logic.
+
+The \textsc{Wysteria} language~\cite{rastogi2014wysteria} % https://www.ieee-security.org/TC/SP2014/papers/Wysteria_c_AProgrammingLanguageforGeneric,Mixed-ModeMultipartyComputations.pdf
+gives fine-grained integration of MPC as a language primitive, to help a larger program use it efficiently.
+Their system assumes (at least one) secure implementation of MPC on circuits.
+
+$\lambda_\textbf{obliv}$~\cite{darais2019language} %
+gives a type system that ensures uniform and independent randomness of key values throughout a program.
+Their system is automated, and could be adapted to ensure perfect noninterference between honest secrets and corrupt views,
+but does not support the kind of \emph{conditional} independence required for most MPC protocols.
+
+\textsc{Owl}~\cite{gancher2023owl} % https://eprint.iacr.org/2023/473.pdf
+gives a type system guaranteeing non-interference with an (extensible) selection of cryptographic operations as language primitives.
+OWL is designed for secure protocols that reveal nothing to the adversary, and does not support verification of MPC security.
+
+Fournet et al.~\cite{fournet2011information} % https://www.microsoft.com/en-us/research/wp-content/uploads/2017/01/information-flow-types-for-homomorphic-encryptions-ccs11.pdf
+also use a type system to ensure safe usage of cryptographic primitives,
+but they specifically work with homomorphic encryption schemes and the various measures by which such schemes may be correct.
+Like \textsc{Owl}, their type system assumes a secure implementation of the encryption scheme and does not support verification of MPC security.
+
+\subsection{PPLs for Inference}
+
+Several PPLs directly support efficient inference and some forms of independence testing.
+A Sum Product Network (SPN)~\cite{poon2011sum} is a directed-graph representation of a multi-variate distribution;
+SPPL~\cite{saad2021sppl} is a PPL that performs inference using SPNs.
+SPNs are compact, allow efficient inference, and can represent values symbolically as needed,
+so testing for conditional independence is practical.
+However, such a language cannot express any existing MPC protocols, and likely cannot express any \textit{useful} protocols,
+because if the language allowed any value to be used more than once, it would result in graphs that violate key invariants of SPNs.
+
+The \textsc{Dice} language~\cite{holtzen2020scaling} analogously translates programs into binary decision diagrams (BDDs).
+BDDs can represent, and do inference on, distributions that aren't representable as SPNs,
+but since the graph \textit{structure} of the BDD of a \textsc{Dice} program depends on the actual \textit{values} on which one is conditioning,
+a \textsc{Dice}-based test for the kind of conditional independence needed for MPC would scale exponentially with the input/output width of the protocol.
+
+\textsc{Lilac}~\cite{li2023lilac} % https://arxiv.org/abs/2304.01339
+is a program logic for reasoning about probability distributions and PPLs.
+It more expressive than the original probabilistic separation logic,
+but does not support automation.
+
+
+\subsection{Probabilistic testing}
+
+Ding et al.~\cite{ding2018detecting} % https://arxiv.org/pdf/1805.10277.pdf
+and more recently Zhang et al.~\cite{zhang2020testing} % https://dl.acm.org/doi/10.1145/3428233
+use large samples of program executions to test for violations of differential privacy,
+showing that such techniques can work on probabilistic hyper-properties.
+Since differential privacy is only concerned with program inputs and outputs,
+the dimensionality of the problem is somewhat smaller than MPC.
+
+Our work builds directly on that of Chalupka et al.~\cite{chalupka2018fast}
+who show that batches of ML classifiers (in practice, decision trees, because they're light-weight) can be used to check conditional independence.
+Specifically, if decision trees (D-Trees) trained on random variables $A$ and $C$
+do better at predicting the value of a random variable $B$ than D-Trees trained only on $C$,
+then $A$ and $B$ are not independent conditioned on $C$.
+The test is statistical; many D-Trees are trained and any apparent advantage of the better-informed ones must be assessed for statistical significance.
+In their work the data is assumed to be permuted sub-samples of some finite pool of samples from a population,
+but in our adaptation we use fresh program traces for everything.
+
 \section{Future Work}
 
 Some further works is needed to turn \toolname into a deploy-able tool;
@@ -830,8 +835,8 @@ our experiments so far are not sufficient to calculate sensible default settings
 and we believe some changes to the way the data is ingested and handled by the tool could improve efficiency.
 
 There are also variations on the core concept of \toolname that we believe are worth exploring.
-Decision trees are not the only candidate for the underlying ML model;
-the additional compute-cost of \eg{} a neural network may turn out to be efficient.
+Decision trees are not the only candidate for the underlying ML model, and our evaluation suggests that they are incapable of performing some of the ``backwards computation'' needed to demonstrate insecurity;
+a more capable model (\eg{} a neural network) may be more capable of detecting these kinds of security bugs.
 Other cryptographic properties besides MPC can likely be framed in terms of conditional independence;
 and so would be amenable to similar tests.
 Finally, because end-to-end static analysis of MPC protocols has proven so difficult,
