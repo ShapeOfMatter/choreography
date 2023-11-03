@@ -468,7 +468,7 @@ and its own tape for output bits.
 \langname supports macros, but they are extremely limited.
 
 \langname supports 1-of-N oblivious transfer as a primitive operation.
-Oblivious transfer~\cite{todo} (OT) is a 2-party protocol that allows one party ($R$, the \emph{receiver}) to select one out of several secret inputs provided by the other party ($S$, the \emph{sender}). In 1-out-of-2 OT, $S$ provides 2 secret inputs $x_0$ and $x_1$ and $R$ provides a secret \emph{selection bit} $b$. If $b=0$, $R$ receives $x_0$; if $b=1$, $R$ receives $x_1$. $R$ does not learn anything about the not-selected secret, and $S$ does not learn which secret $R$ selected. This idea can be extended to 1-out-of-$n$ OT by extending the selection bit $b$ to a $\log_2(n)$-bit string.
+Oblivious transfer~\cite{kilian1988founding} (OT) is a 2-party protocol that allows one party ($R$, the \emph{receiver}) to select one out of several secret inputs provided by the other party ($S$, the \emph{sender}). In 1-out-of-2 OT, $S$ provides 2 secret inputs $x_0$ and $x_1$ and $R$ provides a secret \emph{selection bit} $b$. If $b=0$, $R$ receives $x_0$; if $b=1$, $R$ receives $x_1$. $R$ does not learn anything about the not-selected secret, and $S$ does not learn which secret $R$ selected. This idea can be extended to 1-out-of-$n$ OT by extending the selection bit $b$ to a $\log_2(n)$-bit string.
 %
 Oblivious transfer is a building block for many other protocols, including the GMW protocol described later.
 
