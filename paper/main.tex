@@ -167,7 +167,6 @@ The \termOfArt{real world view}, $\mathsf{Real}_P(Π, \vec{x})$, of a party P is
 its inputs, outputs, all messages it receives, and all the bits of random tape it uses.
 Both these concepts extend naturally to lists of parties.
 
-\todo{this is the first place the simulator is mentioned, but it's not described}
 \begin{definition}[Passive MPC Security]\label{def:passive-mpc}
     A protocol Π,
     involving participating parties P,
@@ -184,6 +183,9 @@ Both these concepts extend naturally to lists of parties.
 Definition~\ref{def:passive-mpc} represents security by a transitive argument:
 Since the adversary in the ideal world can compute all the data the real-world adversary starts with,
 anything the real-world adversary can compute the ideal-world adversary can also compute!
+The hypothetical function $\mathtt{SIM}$ is called a "simulator";
+it simulates in the ideal world what the real-world adversary would see.
+Often MPC security proofs will give an explicit simulator function.
 
 In practice, security is usually quantified over all possible corruptions $C$
 where $\lvert C \rvert \leq \frac{\lvert P \rvert}{r}$ for some $r$, but this is not fundamental and we only consider a single $C$ at a time.
