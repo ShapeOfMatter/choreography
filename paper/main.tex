@@ -474,23 +474,23 @@ Oblivious transfer is a building block for many other protocols, including the G
 
 \todo{refer to an example figure and/or an appendix.}
 
-\subsection{Random generation of programs}
+\subsection{Bug-Finding in Generated Protocols}
 \label{sec:random-protocols}
 
-The goal of this work is a tool that can detect mistakes in MPC protocols.
-Such a tools is only useful if there if new protocols and implementations are being written.
-Therefore, while it is critical to demonstrate that our tool can detect errors manually edited into known-secure protocols,
-we \textit{also} need to show that the tool can detect a lack of security in entirely novel and maximally diverse protocols.
-We attempt to show this by randomly generating hundreds [can we say thousands?] of protocols and testing them with different test parameters.
+The goal of this work is a tool that can detect mistakes in diverse MPC protocols.
+% Such a tools is only useful if there if new protocols and implementations are being written.
+% Therefore, while it is critical to demonstrate that our tool can detect errors manually edited into known-secure protocols,
+% we \textit{also} need to show that the tool can detect a lack of security in entirely novel and maximally diverse protocols.
+We evaluate the generality of the approach by randomly generating hundreds of protocols and testing them with different test parameters.
 We also use a batch of randomly generated protocols to asses the effects of the three test parameters
 (\texttt{iters}, \texttt{trainN}, and \texttt{testN})
 on the test's power and runtime.
 
-The probability that a randomly generated protocol will be MPC secure is not completely negligible.
+Randomly-generated protocols are likely to be insecure, but the probability of generating a secure protocol is not zero.
 In particular, some generator settings will be biased toward vacuous protocols in which nothing is communicated
 or vacuously secure protocols in which the honest secrets are fully revealed by the ideal functionality.
-(Never mind that such protocols are useless; none of the protocols generated in this experiment are \textit{useful}.)
-That said, for reasonable generator settings we find that very few generated protocols
+% (Never mind that such protocols are useless; none of the protocols generated in this experiment are \textit{useful}.)
+For reasonable generator settings we find that very few generated protocols
 continue to appear secure as we increase the power of the test.
 
 \paragraph{Experiment setup.}
@@ -748,7 +748,7 @@ The primary computational cost of \toolname is the time taken to train the decis
 
 \subsection{Discussion}
 
-The results of these experiments suggest that \toolname scales linearly with protocol size and test power, and is capable of detecting bugs in real-world protocols. The test typically runs in just seconds to minutes. The results of our experiment on protocol mutations show that \toolname is effective for detecting important classes of security bugs, but that care must be taken in interpreting the results.
+The results of these experiments suggest that \toolname scales linearly with protocol size and test power, and is capable of detecting bugs in both randomly-generated and real-world protocols. The test typically runs in just seconds to minutes. The results of our experiment on protocol mutations show that \toolname is effective for detecting important classes of security bugs, but that care must be taken in interpreting the results.
 
 For security bugs that directly reveal sensitive information (e.g. \textbf{biased sharing} bugs) \toolname is particularly effective. Our results suggest that \toolname is capable of detecting these accidental disclosures even at low test powers and in the context of large protocols.
 
@@ -875,6 +875,13 @@ and usefully-powerful tests take just a few minutes.
 \section{Additional Experimental Results}
 \label{sec:addit-exper-results}
 
+This Appendix contains additional experimental results excluded from the main body of the paper:
+%
+\begin{itemize}
+\item Figure~\ref{fig:extra1} presents additional results for $n$-bit addition.
+\item Figure~\ref{fig:extra2} presents additional results for $n$-bit less-than comparison.
+\item Figure~\ref{fig:extra3} presents additional results for $n$-bit Beaver triple generation.
+\end{itemize}
 
 
 \input{full_figures.tex}
