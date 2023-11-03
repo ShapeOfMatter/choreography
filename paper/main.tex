@@ -310,7 +310,9 @@ This section describes \toolname, our approach for using statistical independenc
 
 Chalupka et al.~\cite{chalupka2018fast} present a high-dimensional conditional independence test based on the observation that if $P(X | Y, Z) = P(X | Y)$ (i.e. $X$ and $Z$ are conditionally independent given $Y$), then $Y$ and $Z$ together will not be more useful for predicting $X$ than $Y$ alone. They leverage this observation to design a test based on training machine learning classifiers: one classifier predicts $X$ from both $Y$ and $Z$, while the other predicts $X$ from $Y$ alone. If the first classifier yields better test error than the second, then the conditional independence property likely does not hold.
 
-\todo{we should maybe introduce decision trees?}
+Chalupka et al. use decision trees (D-Trees) as their ML classifiers.
+Because the process requires training many copies of the model, a light-weight model like a D-Tree is preferable;
+we also use D-Trees for \toolname.
 
 \subsection{The \toolname Algorithm}
 
