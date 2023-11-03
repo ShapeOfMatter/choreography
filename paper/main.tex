@@ -313,6 +313,8 @@ Chalupka et al.~\cite{chalupka2018fast} present a high-dimensional conditional i
 Chalupka et al. use decision trees (D-Trees) as their ML classifiers.
 Because the process requires training many copies of the model, a light-weight model like a D-Tree is preferable;
 we also use D-Trees for \toolname.
+In principal, \textit{any} ML classifier would be ok to use; the choice is partly an engineering question
+and partly a judgment call about what kinds of systems will be best able to discern patterns in the views of the subject protocol.
 
 \subsection{The \toolname Algorithm}
 
@@ -335,9 +337,7 @@ We use the techniques from Chalupka et al.~\cite{chalupka2018fast} to build \too
 which directly tests for the above conditional dependence without any static analysis of the subject protocol.
 
 To actually test a protocol, \toolname uses two identical machine learning (ML) tools to predict the honest secrets based on the corrupt views.
-One of the two models has access to the real-world views, and the only has access to the ideal-world views.
-In principal, \textit{any} ML classifier is ok to use; the choice is partly an engineering question
-and partly a judgment call about what kinds of systems will be best able to discern patterns in the views of the subject protocol.
+One of the two models has access to the real-world views, and the other only has access to the ideal-world views.
 Generating the data for these tests requires running the protocol many times.
 The process is enumerated in Algorithm 1.
 Note that the data must be understood as vectors/matrices/tensors of bits;
