@@ -309,6 +309,8 @@ This section describes \toolname, our approach for using statistical independenc
 
 Chalupka et al.~\cite{chalupka2018fast} present a high-dimensional conditional independence test based on the observation that if $P(X | Y, Z) = P(X | Y)$ (i.e. $X$ and $Z$ are conditionally independent given $Y$), then $Y$ and $Z$ together will not be more useful for predicting $X$ than $Y$ alone. They leverage this observation to design a test based on training machine learning classifiers: one classifier predicts $X$ from both $Y$ and $Z$, while the other predicts $X$ from $Y$ alone. If the first classifier yields better test error than the second, then the conditional independence property likely does not hold.
 
+\todo{we should maybe introduce decision trees?}
+
 \subsection{The \toolname Algorithm}
 
 If a simulator $\mathtt{SIM}$ exists for a protocol Π implementing functionality F,
@@ -460,16 +462,13 @@ In addition to bit-level computations and transmission of single bits between ar
 each party has its own read-only tapes for secret inputs and randomness,
 and its own tape for output bits.
 \langname supports macros, but they are extremely limited.
-Finally, \langname supports 1-of-N oblivious transfer as a primitive operation.
-This allows us to test (correct and incorrect) implementations of the classic GMW protocol.
 
-\paragraph{Oblivious Transfer.}
+\langname supports 1-of-N oblivious transfer as a primitive operation.
 Oblivious transfer~\cite{todo} (OT) is a 2-party protocol that allows one party ($R$, the \emph{receiver}) to select one out of several secret inputs provided by the other party ($S$, the \emph{sender}). In 1-out-of-2 OT, $S$ provides 2 secret inputs $x_0$ and $x_1$ and $R$ provides a secret \emph{selection bit} $b$. If $b=0$, $R$ receives $x_0$; if $b=1$, $R$ receives $x_1$. $R$ does not learn anything about the not-selected secret, and $S$ does not learn which secret $R$ selected. This idea can be extended to 1-out-of-$n$ OT by extending the selection bit $b$ to a $\log_2(n)$-bit string.
 %
-Oblivious transfer is a building block for many other protocols.
+Oblivious transfer is a building block for many other protocols, including the GMW protocol described later.
 
-
-TODO: refer to an example figure and/or an appendix.
+\todo{refer to an example figure and/or an appendix.}
 
 \subsection{Random generation of programs}
 \label{sec:random-protocols}
