@@ -607,14 +607,12 @@ All six protocols are designed for two parties, with the addition of a third ``d
     \hline
     \textbf{MPC Frameworks} & \textbf{Approach} \\
     \hline
-    %Oblivious Transfer & Building block & TODO \\
-%    OT Extension & Building block & TODO \\
     GMW~\cite{goldreich2019play, goldreich2009foundations} & Oblivious Transfer\\
     MPC w/ Beaver Triples~\cite{beaver1992efficient} & Beaver Triples\\[4pt]
     \hline
-    \textbf{Instantiated Functions} & \textbf{Leakage}\\
+    \textbf{Instantiated Functions} & \textbf{Invertibility}\\
     \hline
-    $n$-bit Addition & All \\
+    $n$-bit Addition & Complete \\
     $n$-bit Less-than Comparison & Partial \\
     Beaver Triple Generation & None \\
     \hline
@@ -640,18 +638,6 @@ Given shares of a Beaver triple, the parties perform two multiplication-by-const
 \paragraph{Functions evaluated.}
 We evaluate three functions, which we express as binary circuits for two parties and compile to \langname programs using the approach described above. All three functions expect input from both the honest and corrupt party. The first, an $n$-bit addition circuit, is vacuously secure---its ideal functionality leaks all of the honest party's inputs, because the corrupt party can subtract their inputs from the $n$-bit result to reconstruct the honest party's inputs. The second, an $n$-bit less-than comparison circuit, only leaks a single bit of information---which of the two inputs is larger. For $n=1$, the less-than protocol is also vacuously secure, but it leaks only partial information about the honest party's inputs for $n>1$. The third, an $n$-bit Beaver triple generator, leaks no information about the honest party's input, since its output to each party is a single secret share of the Beaver triple.
 
-% \paragraph{$n$-bit Addition.}
-% The simplest protocol in our evaluation is a basic summation protocol, which adds up the inputs from the two participating parties. To accomplish this task, the protocol essentially simulates a hardware adder circuit---for each bit in the binary representation of the two input numbers, the protocol performs bitwise operations to compute the sum and carry bit. To ensure security, the input values are \emph{secret shared} using additive secret sharing; to secret share a bit, a party selects a random bit to represent one share, and computes the other share by XORing the random bit with the secret bit. In \langname, $P_1$ can secret share the bit $x$ with $P_2$ as follows:
-% %
-% \begin{verbatim}
-%   s1 = FLIP @P1
-%   s2 = x + s1
-%   SEND s1 TO P2
-% \end{verbatim}
-% %
-% $P_1$ can safely send one share to $P_2$, as long as $P_1$ keeps the other share for themselves---neither share alone reveals anything about the secret bit. To add (i.e. XOR) two secret-shared bits, each party can simply add its shares for the two bits to obtain one share of the result. To multiply (i.e. AND) two secret-shared bits, the parties must use oblivious transfer (described next).
-
-% Our $n$-bit addition protocol generates a \langname source file for a given bitwidth. In our evaluation, we test several different bitwidths to examine the effect of the size of each party's view on the scalability and bug-finding capability of \toolname.
 
 \begin{figure*}
   \centering
@@ -679,13 +665,6 @@ We evaluate three functions, which we express as binary circuits for two parties
 \end{figure*}
 
 
-% \paragraph{Oblivious Transfer Extension.}
-% Protocols like GMW (described later) require the use of OT for each AND gate---for large circuits, this means thousands or millions of OTs. \emph{OT extension}~\cite{todo} is an approach for expanding $k$ ``base'' OTs into $m \gg k$ OTs. OT extension can significantly improve the performance of protocols that use many OTs.
-
-
-
-% Our empirical evaluation demonstrates \toolname's ability to detect bugs in secure protocols.
-% To answer RQ1, we generate \emph{random protocols} of varying sizes, and evaluate \toolname's ability to show they are insecure. The details appear in Section~\ref{sec:experiment-1:-random}. To answer RQ2, we evaluate \toolname on the case study protocols described in Section~\ref{sec:case-study-protocols}. The details appear in Section~\ref{sec:experiment-2:-real}. In both cases, \toolname is able to detect insecurity in the target protocols in under a minute.
 
 \begin{figure*}
   \centering
@@ -715,13 +694,15 @@ We evaluate three functions, which we express as binary circuits for two parties
 \subsubsection{Experiment Setup}
 \label{sec:e2-experiment-setup}
 
-We run \toolname on the unmodified protocol in order to establish the protocol's security. Then, we mutate the protocol in several ways to introduce security bugs, and test \toolname's ability to detect these bugs. Specifically, our mutations are:
+We run \toolname on the unmodified protocol in order to establish the protocol's security
+and show that \toolname doesn't flag secure protocols as insecure.
+Then, we mutate the protocol in several ways to introduce security bugs, and test \toolname's ability to detect these bugs. Specifically, our mutations are:
 %
 \begin{itemize}
 \item \textbf{Biased sharing}: uses biased randomness to construct secret shares of honest party inputs.
 \item \textbf{Biased AND}: uses biased randomness as part of the evaluation of multiplication gates.
-\item \textbf{Accidental secret}: accidentally sends a secret held by the honest party  to the corrupt party.
-\item \textbf{Accidental gate}: accidentally sends an honest party's result from the evaluation of a multiplication gate to the corrupt party.
+\item \textbf{Accidental secret}: sometimes, at random, accidentally sends a secret held by the honest party  to the corrupt party.
+\item \textbf{Accidental gate}: sometimes, at random, accidentally sends an honest party's result from the evaluation of a multiplication gate to the corrupt party.
 \end{itemize}
 %
 The severity of each mutation can be tuned by adjusting the bias in the related randomness. In the case of \textbf{accidental secret} and \textbf{accidental gate}, this affects the probability of accidentally revealing a value; in the others, it directly adjust the bias in the randomness.
@@ -738,9 +719,15 @@ The results appear in Figures~\ref{fig:results_security} and~\ref{fig:results_tr
 
 \toolname detects \textbf{accidental secret} bugs in the same cases as biased sharing bugs, for the same reasons.
 
-\toolname detects \textbf{accidental gate} bugs only in the $n$-bit less-than comparison based on the GMW framework. In the Beaver-triple framework, we hypothesize that the decision trees are not capable of the ``backwards computation'' required to leverage the leaked information; in the other cases, the function's design means that AND gate outputs do not provide additional leakage beyond the ideal functionality.
+\toolname detects \textbf{accidental gate} bugs in the $n$-bit less-than comparison only in the OT-based GMW framework.
+In the Beaver-triple framework, we hypothesize that the decision trees are not capable of the ``backwards computation''
+required to leverage the leaked information
 
-\toolname fails to detect \textbf{biased AND} and \textbf{accidental gate} bugs in the case of $n$-bit Beaver triple generation because the result of each AND gate is also one of the protocol's outputs---so a bug which reveals it does not leak any new information. \toolname detects \textbf{accidental gate} bugs for the $n$-bit Beaver triple generation function when the Beaver-triple-based protocol is used, because biasing the randomness for AND gates reveals information about the Beaver triples themselves, from which it is possible to deduce the honest party's shares of the inputs.
+In other cases, the function's design means that AND gate outputs do not provide additional leakage beyond the ideal functionality,
+and therefore do not compromise security.
+\toolname ignores \textbf{biased AND} and \textbf{accidental gate} bugs in the case of $n$-bit Beaver triple generation
+because the result of each AND gate is also one of the protocol's outputs---so a bug which reveals it does not leak any new information.
+\toolname detects \textbf{accidental gate} bugs for the $n$-bit Beaver triple generation function when the Beaver-triple-based protocol is used, because biasing the randomness for AND gates reveals information about the Beaver triples themselves, from which it is possible to deduce the honest party's shares of the inputs.
 
 
 \paragraph{Scalability.}
