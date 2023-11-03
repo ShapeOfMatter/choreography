@@ -301,9 +301,15 @@ the various used by good property-based testing frameworks to efficiently find i
 
 
 
-\section{Statistical testing for MPC insecurity}
+\section{\toolname: a Statistical Test for Security}
 
-\subsection{Test algorithm}
+This section describes \toolname, our approach for using statistical independence testing to find security bugs in MPC protocols. The approach is based on the \emph{fast conditional independence test} proposed by Chalupka et al.~\cite{chalupka2018fast}.
+
+\subsection{Conditional Independence Testing by Classification}
+
+Chalupka et al.~\cite{chalupka2018fast} present a high-dimensional conditional independence test based on the observation that if $P(X | Y, Z) = P(X | Y)$ (i.e. $X$ and $Z$ are conditionally independent given $Y$), then $Y$ and $Z$ together will not be more useful for predicting $X$ than $Y$ alone. They leverage this observation to design a test based on training machine learning classifiers: one classifier predicts $X$ from both $Y$ and $Z$, while the other predicts $X$ from $Y$ alone. If the first classifier yields better test error than the second, then the conditional independence property likely does not hold.
+
+\subsection{The \toolname Algorithm}
 
 If a simulator $\mathtt{SIM}$ exists for a protocol Π implementing functionality F,
 and we suppose fixed corrupt inputs $\vec{x}_C$,
@@ -320,7 +326,7 @@ $$
 \nexists \; \mathtt{SIM}
 $$
 
-We use the techniques from \cite{chalupka2018fast}
+We use the techniques from Chalupka et al.~\cite{chalupka2018fast}
 to directly test for conditional dependence without any static analysis of the subject protocol.
 
 To actually test a protocol, one uses two identical machine learning (ML) tools to predict the honest secrets based on the corrupt views.
@@ -358,7 +364,7 @@ aggregating values into larger structures such as bytes or integers would at bes
   \end{algorithmic}
 \end{algorithm}
 
-\subsection{Theoretical issues}
+\subsection{Interpreting Test Results}
 
 In principal the only aspect of MPC (in)security that conditional (in)dependence fails to capture
 is the constraint on a hypothetical adversary's computational power.
@@ -368,7 +374,7 @@ something that would require super-polynomial-time in the ideal world.
 We believe this to be a much smaller concern in practice than the statistical limitations of independence testing.
 
 The usual trade-offs of significance testing apply.
-Setting $\alpha$ too low will cause programs who's insecure-ness is only marginally discernible to the D-Trees
+Setting $\alpha$ too low will cause programs whose insecure-ness is only marginally discernible to the D-Trees
 to pass the test.
 Setting $\alpha$ higher will compromise one's certainty that a failing program truly is insecure.
 There are three reasons why this is not a serious problem with the test, each worth considering as its own subtlety.
@@ -423,9 +429,7 @@ The individulal ML models are instances of \texttt{sklearn.tree.DecisionTreeClas
 and they're trained in parallel with \texttt{joblib.Parallel}.
 The D-Tree scores are inflated by $+1 \cdot 10^{-10}$ to avoid division-by-zero in the score-ratio,
 and the score distributions are compared by \texttt{scipy.stats.wilcoxon}.
-
-TODO: link to github or other archive?
-
+Our implementation and the code to reproduce our experimental evaluation are available as open-source.\footnote{(Link removed for anonymous submission)}
 
 
 \section{Evaluation}
