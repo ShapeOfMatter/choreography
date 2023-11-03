@@ -758,12 +758,11 @@ use EasyCrypt to manually show the security of GMW.
 Their definitions generalize to protocols with efficiently invertible functionalities.
 % remove? Since existing general-purpose SMPC protocols can easily compute non-invertible functions, this is a serious limitation.
 They model SMPC as a non-interference property: Honest secrets are non-interfering on the corrupt views conditioned on the corrupt outputs.
-If their system could be automated and paired with language constraints to ensure invertibility then it
-could apply to many, but certainly not all, use cases.
+Their approach requires manual proof in EasyCrypt.
 
 Barthe et al.~\cite{barthe2019probabilistic} % https://arxiv.org/abs/1907.10708 A Probabilistic Separation Logic
 give a framework for probabilistic reasoning and show that it can be used to prove security of additive secret sharing.
-Even if the technique could be automated, it's unclear how it would generalize to any other kind of protocol.
+However, the framework is not amenable to automation.
 
 Gancher et al.~\cite{gancher2023core} % https://dl.acm.org/doi/pdf/10.1145/3571223
 give a powerful language system that can check if one protocol is a valid simulator of another,
@@ -778,24 +777,21 @@ give fine-grained integration of MPC as a language primitive, to help a larger p
 
 Darais et al.~\cite{darais2019language} %
 gives a type system that ensures uniform and independent randomness of key values throughout a program.
-Their system could be adapted to ensure perfect uniformity of parties' views in a protocol,
-but this would of course prevent any non-vacuous functionality from being implemented.
+Their system is automated, and could be adapted to ensure perfect noninterference between honest secrets and corrupt views, but does not support the kind of \emph{conditional} independence required for most MPC protocols.
 
 OWL~\cite{gancher2023owl} % https://eprint.iacr.org/2023/473.pdf
 gives a type system guaranteeing non-interference with an (extensible) selection of cryptographic operations as language primitives.
-They can type-check more convoluted uses of operations like encryption and hashing, but without features for inference or inversion,
-there's no way to verify an implementation of MPC.
+OWL is designed for secure protocols that reveal nothing to the adversary, and does not support verification of MPC security.
 
 Fournet et al.~\cite{fournet2011information} % https://www.microsoft.com/en-us/research/wp-content/uploads/2017/01/information-flow-types-for-homomorphic-encryptions-ccs11.pdf
 also use a type system to ensure safe usage of cryptographic primitives,
 but they specifically target homomorphic encryption schemes and the various measures by which such schemes may be correct.
-Like OWL, their type system assumes a secure implementation of the encryption scheme.
+Like OWL, their type system assumes a secure implementation of the encryption scheme and does not support verification of MPC security.
 
 \subsection{PPLs for Inference}
 
-We experimented with choreography languages that translate directly into Sum Product Networks (SPNs)~\cite{poon2011sum}.
-A SPN is directed-graph representation of a multi-variate distribution;
-they are compact, allow efficient inference, and can represent values symbolically as needed,
+Several PPLs directly support efficient inference and some forms of independence testing. A Sum Product Network (SPN)~\cite{poon2011sum} is a directed-graph representation of a multi-variate distribution; SPPL~\cite{saad2021sppl} is a PPL that performs inference using SPNs.
+SPNs are compact, allow efficient inference, and can represent values symbolically as needed,
 so testing for conditional independence is practical.
 However, such a language cannot express any existing MPC protocols, and likely cannot express any \textit{useful} protocols,
 because if the language allowed any value to be used more than once, it would result in graphs that violate key invariants of SPNs.
@@ -808,7 +804,7 @@ a dice-based test for the kind of conditional independence needed for MPC would 
 Lilac~\cite{li2023lilac} % https://arxiv.org/abs/2304.01339
 is a program logic for reasoning about probability distributions and PPLs.
 It more expressive than the original probabilistic separation logic,
-but it has not yet been applied to MPC, nor is it clear how it would be used in an automated test.
+but does not support automation.
 
 \subsection{Probabilistic testing}
 
@@ -834,8 +830,8 @@ our experiments so far are not sufficient to calculate sensible default settings
 and we believe some changes to the way the data is ingested and handled by the tool could improve efficiency.
 
 There are also variations on the core concept of \toolname that we believe are worth exploring.
-Decision trees are not the only candidate for the underlying ML model;
-the additional compute-cost of \eg{} a neural network may turn out to be efficient.
+Decision trees are not the only candidate for the underlying ML model, and our evaluation suggests that they are incapable of performing some of the ``backwards computation'' needed to demonstrate insecurity;
+a more capable model (\eg{} a neural network) may be more capable of detecting these kinds of security bugs.
 Other cryptographic properties besides MPC can likely be framed in terms of conditional independence;
 and so would be amenable to similar tests.
 Finally, because end-to-end static analysis of MPC protocols has proven so difficult,
