@@ -9,7 +9,7 @@
 \usepackage{xcolor}
 \usepackage{booktabs}
 \usepackage[hidelinks]{hyperref}
-\usepackage{natbib}
+%\usepackage{natbib}
 
 \usepackage{amsthm}
 %%\usepackage{newpxtext}  %% for _e.g._ macro.
@@ -36,14 +36,22 @@
 \newcommand{\mynote}[2]
     {{\color{red} \fbox{\bfseries\sffamily\scriptsize#1}
     {\small$\blacktriangleright$\textsf{\emph{#2}}$\blacktriangleleft$}}~}
-%\newcommand{\mynote}[2]{}
 \newcommand{\todo}[1]{\mynote{TODO}{#1}}
 
 \title{\toolname: Property-Based Testing for MPC Security}
 
-%\author{First1 Last1}
-%%\authornote{with author1 note}        %% and a great more deleted...
-
+\author{\IEEEauthorblockN{Mako Bates}
+\IEEEauthorblockA{\textit{University of Vermont} \\
+Burlington, Vermont, US \\
+mako.bates@uvm.edu
+}
+\and
+\IEEEauthorblockN{Joe Near}
+\IEEEauthorblockA{\textit{University of Vermont} \\
+Burlington, Vermont, US \\
+jnear@uvm.edu
+}
+}
 
 \begin{document}
 
@@ -119,14 +127,8 @@ In summary, our contributions are:
 \item We introduce \toolname, the first property-based testing tool for MPC security.
 \item We conduct an empirical evaluation of \toolname, demonstrating its ability to scale to realistic MPC protocols and detect security bugs.
 \end{itemize}
-  
-% In this work we present and evaluate a statistical test of the security of MPC protocols.
-% First we show how MPC security relates to inference and equivalence of probabilistic distributions,
-% and then we demonstrate that existing tests of distributional equivalence can, with minor modification, be used to refute MPC security.
-% Our tool is adaptable to the wide range of cryptographic security properties that can be defined in terms of distributional equivalence,
-% and our tool is applicable to any software system that
-% A) can be run 10k-1M times without great inconvenience, and
-% B) allows certain intermediate values (of which consumed randomness is the least convenient) to be captured for analysis.
+
+
 
 \section{Background}
 
@@ -482,9 +484,6 @@ An example \langname program is provided in Appendix~\ref{sec:example-cho}.
 \label{sec:random-protocols}
 
 The goal of this work is a tool that can detect mistakes in diverse MPC protocols.
-% Such a tools is only useful if there if new protocols and implementations are being written.
-% Therefore, while it is critical to demonstrate that our tool can detect errors manually edited into known-secure protocols,
-% we \textit{also} need to show that the tool can detect a lack of security in entirely novel and maximally diverse protocols.
 We evaluate the generality of the approach by randomly generating hundreds of protocols and testing them with different test parameters.
 We also use a batch of randomly generated protocols to asses the effects of the three test parameters
 (\texttt{iters}, \texttt{trainN}, and \texttt{testN})
